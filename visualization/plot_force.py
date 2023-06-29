@@ -32,5 +32,5 @@ plt.yticks(fontsize=24, rotation=0)
 # plt.ylim([0,6])
 plt.ylim([0,4])
 
-plt.savefig(f'/home/baothach/stress_field_prediction/visualization/figures/{grasp_orientation}/measured_vs_desired_force_Kp={Kp}.png')  #, bbox_inches='tight', pad_inches=0.1)
+plt.savefig(f'../visualization/figures/{grasp_orientation}/measured_vs_desired_force_Kp={Kp}.png')  #, bbox_inches='tight', pad_inches=0.1)
 plt.show()
