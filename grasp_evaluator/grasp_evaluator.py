@@ -66,7 +66,7 @@ class GraspEvaluator:
         # self.franka_urdf = os.path.abspath(self.cfg['dir']['franka_urdf'])
         # self.results_dir = os.path.abspath(self.cfg['dir']['results_dir'])
         
-        sim_data_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data"
+        sim_data_main_path = os.path.abspath("sim_data/stress_prediction_data")
         self.assets_dir = os.path.join(sim_data_main_path, self.cfg['dir']['assets_dir'])
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])

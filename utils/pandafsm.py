@@ -1065,6 +1065,7 @@ class PandaFsm:
 
             torque_des_force, F_curr_mag, F_err = self.get_force_based_torque(
                 F_des, F_curr)
+            # self.torque_des[-2:] = torque_des_force
             self.torque_des[-2:] = torque_des_force
             self.f_errs = np.hstack((self.f_errs[1:], F_err))
 
