@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
-from utils.miscellaneous_utils import get_object_particle_state, pcd_ize 
+from utils.miscellaneous_utils import get_object_particle_state 
 from utils.camera_utils import *
 from isaacgym import gymtorch
 import pickle
@@ -71,8 +71,6 @@ class GraspEvaluator:
         self.assets_dir = os.path.join(sim_data_main_path, self.cfg['dir']['assets_dir'])
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
-        self.data_recording_path = self.cfg['data_recording']['data_recording_path']
-        os.makedirs(self.data_recording_path, exist_ok=True)
         
         self.object_path = os.path.join(self.assets_dir, self.object_name)
         self.tag = tag
@@ -135,7 +133,7 @@ class GraspEvaluator:
         # print(self.grasp_candidate_poses)
         
 
-        # self.grasp_candidate_poses = f['poses'][0:1]  # height grasp
+        self.grasp_candidate_poses = f['poses'][0:1]  # height grasp
         # self.grasp_candidate_poses = f['poses'][1:2]  # width grasp
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
         
@@ -237,7 +235,6 @@ class GraspEvaluator:
 
         asset_options.fix_base_link = False
         asset_options.min_particle_mass = 1e-20
-        asset_options.disable_gravity = True    # no gravity on deformable object
         self.asset_handle_object = self.gym.load_asset(self.sim, asset_root, asset_file_object,
                                                        asset_options)
 
@@ -453,10 +450,6 @@ class GraspEvaluator:
                 test_grasp_pose[4], test_grasp_pose[5], test_grasp_pose[6],
                 test_grasp_pose[3])  # fix z_up
 
-            data_recording_arguments = {"data_recording_path": self.data_recording_path, \
-                                        "object_name": self.object_name, "young_modulus": self.youngs, "object_scale": self.object_scale, \
-                                        "grasp_ind": self.grasp_ind, "grasp_pose": self.grasp_candidate_poses}
-
             panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
                                           gym_handle=self.gym,
                                           sim_handle=self.sim,
@@ -474,8 +467,7 @@ class GraspEvaluator:
                                           youngs=self.youngs,
                                           density=self.density,
                                           directions=np.asarray(directions),
-                                          mode=self.mode.lower(),
-                                          **data_recording_arguments)
+                                          mode=self.mode.lower())
             panda_fsms.append(panda_fsm)
 
         close_viewer = False
@@ -487,27 +479,14 @@ class GraspEvaluator:
 
             # frame_count += 1
             # if frame_count == 2:
-            # #     output_file = "/home/baothach/Downloads/test_cam_views.png"
-            # #     visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-            # #                         resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+            #     output_file = "/home/baothach/Downloads/test_cam_views.png"
+            #     visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+            #                         resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
-            # #     get_object_particle_state(self.gym,self.sim,vis=True)
-            # #     start_time = timeit.default_timer()
-            # #     get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], self.cam_handles[0], self.pc_cam_props, robot_segmentationId=11, object_name="deformable", color=None, min_z=-0.005, visualization=True, device="cpu")
-            # #     print("Rendering time:", timeit.default_timer()-start_time)
-
-            #     segmentationId_dict = {"robot": 11}
-            #     partial_pcs = []    # list of 8 point clouds from 8 different camera views
-            #     for cam_handle in self.cam_handles[:2]:
-            #         partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
-            #                                                     segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
-            #                                                     visualization=False, device="cpu")
-            #         partial_pcs.append(deepcopy(partial_pc))
-
-            #     pcds = []
-            #     for pc in partial_pcs:
-            #         pcds.append(pcd_ize(pc))
-            #     open3d.visualization.draw_geometries(pcds) 
+            #     get_object_particle_state(self.gym,self.sim,vis=True)
+            #     start_time = timeit.default_timer()
+            #     get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], self.cam_handles[0], self.pc_cam_props, robot_segmentationId=11, object_name="deformable", color=None, min_z=-0.005, visualization=True, device="cpu")
+            #     print("Rendering time:", timeit.default_timer()-start_time)
 
             if self.cfg['use_viewer']:
                 close_viewer = self.gym.query_viewer_has_closed(self.viewer)                        
@@ -532,6 +511,9 @@ class GraspEvaluator:
 
             self.gym.refresh_particle_state_tensor(self.sim)   
 
+            # pcd = open3d.geometry.PointCloud()
+            # pcd.points = open3d.utility.Vector3dVector(panda_fsms[0].particle_state_tensor.numpy()[:, :3])
+            # open3d.visualization.draw_geometries([pcd])   
 
             for i in range(len(self.env_handles)):
                 if panda_fsms[i].state != "done":
@@ -545,13 +527,12 @@ class GraspEvaluator:
 
             if self.cfg['use_viewer']:
                 self.gym.draw_viewer(self.viewer, self.sim, True)
-        
-        # save measured and desired forces for debugging
-        if self.cfg['miscellaneous']['force_debug_recording_path']:            
-            recording_path = self.cfg['miscellaneous']['force_debug_recording_path'] #"visualization/recorded_forces/width_grasp"
-            os.makedirs(recording_path, exist_ok=True)
-            with open(os.path.join(recording_path, f"Kp={self.cfg['force_control']['Kp']}.pickle"), 'wb') as handle:
-                pickle.dump(panda_fsms[0].recorded_forces, handle, protocol=pickle.HIGHEST_PROTOCOL)   
+
+        # # save measured and desired forces for debugging
+        # save_path = "visualization/recorded_forces/width_grasp"
+        # os.makedirs(save_path, exist_ok=True)
+        # with open(os.path.join(save_path, f"Kp={self.cfg['force_control']['Kp']}.pickle"), 'wb') as handle:
+        #     pickle.dump(panda_fsms[0].recorded_forces, handle, protocol=pickle.HIGHEST_PROTOCOL)   
 
         # Clean up
         if self.cfg['use_viewer']:

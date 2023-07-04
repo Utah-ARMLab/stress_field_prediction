@@ -1,0 +1,1 @@
+OBJECT_NAMES = ["rectangle"]

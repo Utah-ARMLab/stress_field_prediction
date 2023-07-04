@@ -122,3 +122,5 @@ def butter_lowpass_filter(data):
     b, a = butter(order, normal_cutoff, btype='low', analog=False)
     y = filtfilt(b, a, data, axis=0)
     return y
+
+

@@ -3,11 +3,12 @@ import numpy as np
 import pickle5 as pickle
 import os
 
-Kp = 0.008
+Kp = 0.006
 
 grasp_orientation = "height_grasp"   # options: width_grasp, height_grasp
 
-save_path = f"recorded_forces/{grasp_orientation}"
+# save_path = f"recorded_forces/{grasp_orientation}"
+save_path = f"recorded_forces/random_tests"
 with open(os.path.join(save_path, f"Kp={Kp}.pickle"), 'rb') as handle:
     data = np.array(pickle.load(handle))
 
@@ -28,9 +29,9 @@ plt.ylabel('Force (N)', fontsize=40)
 plt.legend(prop={'size': 24})
 plt.xticks(fontsize=24)
 plt.yticks(fontsize=24, rotation=0)
-# # plt.subplots_adjust(bottom=0.15)
 # plt.ylim([0,6])
-plt.ylim([0,4])
+# plt.ylim([0,4])
 
-plt.savefig(f'../visualization/figures/{grasp_orientation}/measured_vs_desired_force_Kp={Kp}.png')  #, bbox_inches='tight', pad_inches=0.1)
+# plt.savefig(f'../visualization/figures/{grasp_orientation}/measured_vs_desired_force_Kp={Kp}.png')  #, bbox_inches='tight', pad_inches=0.1)
+plt.savefig(f'../visualization/figures/random_tests/measured_vs_desired_force_Kp={Kp}.png')
 plt.show()

@@ -27,6 +27,7 @@ from isaacgym import gymtorch
 
 from utils import panda_fk
 from utils import tet_based_metrics
+from utils.miscellaneous_utils import record_data_stress_prediction
 # import open3d
 import pickle
 import os
@@ -41,7 +42,7 @@ class PandaFsm:
     def __init__(self, cfg, gym_handle, sim_handle, env_handles, franka_handle,
                  platform_handle, object_cof,
                  grasp_transform, obj_name, env_id, hand_origin, viewer,
-                 envs_per_row, env_dim, youngs, density, directions, mode):
+                 envs_per_row, env_dim, youngs, density, directions, mode, **kwargs):
         """Initialize attributes of grasp evaluation FSM.
 
         Args: gym_handle (gymapi.Gym): Gym object.
@@ -67,6 +68,12 @@ class PandaFsm:
         self.started = False
         self.state = 'open'
         self.cfg = cfg
+        self.data_recording_path = kwargs.get('data_recording_path', None)
+        self.grasp_ind = kwargs.get('grasp_ind', None)
+        self.grasp_pose = kwargs.get('grasp_pose', None)
+        self.object_name = kwargs.get('object_name', None)
+        self.young_modulus = kwargs.get('young_modulus', None)
+        self.object_scale = kwargs.get('object_scale', None)        
 
         # Simulation handles
         self.gym_handle = gym_handle
@@ -886,7 +893,7 @@ class PandaFsm:
             self.mg = 9.81 * object_volume * self.density
             # self.desired_force = self.FOS * 9.81 \
             #     * object_volume * self.density / self.object_cof    * 100
-            self.desired_force = 1
+            self.desired_force = 1.0
             # self.FOS /= 100
 
 
@@ -1147,14 +1154,27 @@ class PandaFsm:
             #         particles_contacting_gripper > 0):
             
             ### If desired squeezing forces is met
-            self.recorded_forces.append(deepcopy(list(F_des)) + deepcopy(list(F_curr)))     # record measured and desired forces for debugging
+            self.recorded_forces.append(list(F_des) + list(F_curr))     # record measured and desired forces for debugging
+            # if np.all(
+            #         np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2
+            # ) and not self.squeezed_until_force and squeeze_guard and np.all(
+            #         particles_contacting_gripper > 0):
             if np.all(
-                    np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2
+                    np.abs(self.f_errs) < 0.05 * self.desired_force
             ) and not self.squeezed_until_force and squeeze_guard and np.all(
                     particles_contacting_gripper > 0):
-
+            
                 print(f"\n xxxxxx success {self.desired_force}N \n") 
-                self.desired_force += 0.5
+
+                if self.cfg['data_recording']['is_recording']:
+                    data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.desired_force}.pickle")
+                    record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
+                                                self.desired_force, self.grasp_pose, 
+                                                [self.franka_dof_states['pos'][-3:][1],self.franka_dof_states['pos'][-3:][2]],
+                                                self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
+
+
+                self.desired_force += 0.25
                               
 
                 # if self.mode == "reorient":

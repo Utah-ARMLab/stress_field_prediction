@@ -10,10 +10,24 @@ sim_params:
 tags:
   results_storage_tag: 'mytag'
 
+force_control:
+  # Kp: 0.002
+  # min_torque: -0.05
+  Kp: 0.006
+  min_torque: -0.05
+
 dir:
   assets_dir: 'objects'
   franka_urdf: 'franka_description/robots/franka_panda_fem_simple_v4_with_arm.urdf'
-  results_dir: 'results'
+  results_dir: 'results' 
+
+data_recording:
+  is_recording: True
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/data'
+
+miscellaneous:
+  force_debug: True
+  force_debug_recording_path: "visualization/recorded_forces/random_tests"
 
 franka:
   num_joints: 16
@@ -28,12 +42,6 @@ timeout:
 lp_filter:
   running_window_size: 50
   averaging_window: 10 
-
-force_control:
-  # Kp: 0.002
-  # min_torque: -0.05
-  Kp: 0.008
-  min_torque: -0.05
 
 squeeze_no_gravity:
   num_dp: 50

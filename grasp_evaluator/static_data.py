@@ -17,7 +17,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-"""GraspEvaluator class to et up and run grasp evaluations."""
+"""StaticDataCollection class to et up and run grasp evaluations."""
 
 import h5py
 import numpy as np
@@ -40,7 +40,7 @@ import pickle
 
 # python3 run_grasp_evaluation.py --object=rectangle --grasp_ind=3 --youngs=2e3 --density=1000 --ori_start=10 --ori_end=10 --mode=pickup
 
-class GraspEvaluator:
+class StaticDataCollection:
     """Simulate selected object, grasp, material params, and evaluation mode."""
 
     def __init__(self, object_name, grasp_ind, oris, density,
@@ -230,11 +230,6 @@ class GraspEvaluator:
         asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
 
 
-        # Set asset options
-        asset_options.fix_base_link = True
-        self.asset_handle_franka = self.gym.load_asset(self.sim, asset_root, self.franka_urdf,
-                                                       asset_options)
-
         asset_options.fix_base_link = False
         asset_options.min_particle_mass = 1e-20
         asset_options.disable_gravity = True    # no gravity on deformable object
@@ -260,8 +255,8 @@ class GraspEvaluator:
 
         """ Camera for getting point cloud. """
         self.pc_cam_props = gymapi.CameraProperties()    
-        self.pc_cam_props.width = 1000  #256
-        self.pc_cam_props.height = 1000 #256
+        self.pc_cam_props.width = 256  #256
+        self.pc_cam_props.height = 256 #256
 
         # pc_cam_position = gymapi.Vec3(-0.1, 0.1, self.cfg['sim_params']['platform_height'] + 0.02 + 0.1)
         # pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
@@ -271,20 +266,22 @@ class GraspEvaluator:
         #     self.cam_handles.append(self.gym.create_camera_sensor(env, self.pc_cam_props))
         #     self.gym.set_camera_location(self.cam_handles[i], env, pc_cam_position, pc_cam_target)
 
-        # cam_pos_z = self.cfg['sim_params']['platform_height'] + 0.02 + 0.02
-        # cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 0.5
-        # cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 0.5
+        cam_pos_z = self.cfg['sim_params']['platform_height'] + 0.03
+        cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 0.5
+        cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 0.5
         
-        # pc_cam_positions = []
-        # pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
-        # for i in range(len(cam_pos_xs)):
-        #     pc_cam_positions.append(gymapi.Vec3(cam_pos_xs[i],cam_pos_ys[i],cam_pos_z))
+        pc_cam_positions = []
+        pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
+        for i in range(len(cam_pos_xs)):
+            pc_cam_positions.append(gymapi.Vec3(cam_pos_xs[i],cam_pos_ys[i],cam_pos_z))
             
-        # self.cam_handles = []
+        self.cam_handles = []
         # for i, env in enumerate(self.env_handles):
-        #     for k in range(len(pc_cam_positions)):
-        #         self.cam_handles.append(self.gym.create_camera_sensor(env, self.pc_cam_props))
-        #         self.gym.set_camera_location(self.cam_handles[k], env, pc_cam_positions[k], pc_cam_target)
+        env = self.env_handles[0]
+        for k in range(len(pc_cam_positions)):
+            cam_handle = self.gym.create_camera_sensor(env, self.pc_cam_props)
+            self.cam_handles.append(cam_handle)
+            self.gym.set_camera_location(cam_handle, env, pc_cam_positions[k], pc_cam_target)
         
   
 
@@ -338,58 +335,11 @@ class GraspEvaluator:
                 self.sim, self.env_lower, self.env_upper, self.envs_per_row)
             self.env_handles.append(env_handle)
 
-            # Define shared pose/collision parameters
-            pose = gymapi.Transform()
-            grasp_transform = gymapi.Transform()
-            grasp_transform.r = gymapi.Quat(test_grasp_pose[4], test_grasp_pose[5],
-                                            test_grasp_pose[6], test_grasp_pose[3])
-
-            _, franka_rpy = metrics_features_utils.get_franka_rpy(grasp_transform.r)
 
             collision_group = i
             collision_filter = 0
 
-            # Create Franka actors
-            pose.p = gymapi.Vec3(test_grasp_pose[0], test_grasp_pose[1],
-                                 test_grasp_pose[2])
-            # pose.p = self.neg_rot_x_transform.transform_vector(pose.p)
-            pose.p.z += self.cfg['sim_params']['platform_height']  # fix z_up
-            franka_handle = self.gym.create_actor(env_handle, self.asset_handle_franka, pose,
-                                                  f"franka_{i}", collision_group, 1, segmentationId=11)
-            self.franka_handles.append(franka_handle)
-
-            curr_joint_positions = self.gym.get_actor_dof_states(
-                env_handle, franka_handle, gymapi.STATE_ALL)
-
-            ang_acc_axis = np.array([0., 0., 1.])
-            pose_transform = R.from_euler('ZYX', franka_rpy)
-            ang_acc_transform = R.align_vectors(np.expand_dims(direction, axis=0),
-                                              np.expand_dims(ang_acc_axis,
-                                                             axis=0))[0]
-            ang_acc_eulers = ang_acc_transform.as_euler('xyz')
-
-            pose_correction = ang_acc_transform.inv() * pose_transform
-            pose_correction_euler = pose_correction.as_euler('xyz')
-
-            # Correct for translation offset to match grasp. Allows for one joint to
-            # be solely responsible for generating angular acceleration
-            q0 = np.array([0., 0., -0.112])
-            q0_ = ang_acc_transform.apply(q0)
-            disp_offset = q0 - q0_
-
-            curr_joint_positions['pos'] = [
-                disp_offset[0], disp_offset[1], disp_offset[2], ang_acc_eulers[2],
-                ang_acc_eulers[1], ang_acc_eulers[0], 0., pose_correction_euler[2],
-                pose_correction_euler[1], pose_correction_euler[0], 0.0, 0.0, 0.0,
-                0, 0.04, 0.04
-            ]
-
-            self.hand_origins.append(pose)
-            finger_pose = gymapi.Transform()
-            finger_pose.p = pose.p
-
-            self.gym.set_actor_dof_states(env_handle, franka_handle,
-                                          curr_joint_positions, gymapi.STATE_ALL)
+ 
 
             # Create soft object
             tet_file_name = os.path.join(self.object_path, self.object_name + ".tet")
@@ -422,61 +372,12 @@ class GraspEvaluator:
                                                     collision_group, 1)
             self.platform_handles.append(platform_handle)
 
-            self.gym.set_rigid_body_color(env_handle, franka_handle, 0,
-                                          gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(0, 1, 0))
+
 
     def run_simulation(self):
         """Perform grasp evaluation."""
-        panda_fsms = []
-        directions = self.all_directions
 
-        for i in range(len(self.env_handles)):
-            if self.mode.lower() in ["reorient", "lin_acc", "ang_acc"]:
-                test_grasp_pose = self.grasp_candidate_poses[0]
-                directions = self.all_directions[i:i + 1]
 
-            else:
-                test_grasp_pose = self.env_spread[i]
-
-            pure_grasp_transform = gymapi.Transform()
-            pure_grasp_transform.r = gymapi.Quat(test_grasp_pose[4],
-                                                 test_grasp_pose[5],
-                                                 test_grasp_pose[6],
-                                                 test_grasp_pose[3])
-            grasp_transform = gymapi.Transform()
-            # grasp_transform.r = self.neg_rot_x * gymapi.Quat(
-            #     test_grasp_pose[4], test_grasp_pose[5], test_grasp_pose[6],
-            #     test_grasp_pose[3])
-
-            grasp_transform.r = gymapi.Quat(
-                test_grasp_pose[4], test_grasp_pose[5], test_grasp_pose[6],
-                test_grasp_pose[3])  # fix z_up
-
-            data_recording_arguments = {"data_recording_path": self.data_recording_path, \
-                                        "object_name": self.object_name, "young_modulus": self.youngs, "object_scale": self.object_scale, \
-                                        "grasp_ind": self.grasp_ind, "grasp_pose": self.grasp_candidate_poses}
-
-            panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
-                                          gym_handle=self.gym,
-                                          sim_handle=self.sim,
-                                          env_handles=self.env_handles,
-                                          franka_handle=self.franka_handles[i],
-                                          platform_handle=self.platform_handles[i],
-                                          object_cof=self.sim_params.flex.dynamic_friction,
-                                          grasp_transform=grasp_transform,
-                                          obj_name=self.object_name,
-                                          env_id=i,
-                                          hand_origin=self.hand_origins[i],
-                                          viewer=self.viewer,
-                                          envs_per_row=self.envs_per_row,
-                                          env_dim=self.env_dim,
-                                          youngs=self.youngs,
-                                          density=self.density,
-                                          directions=np.asarray(directions),
-                                          mode=self.mode.lower(),
-                                          **data_recording_arguments)
-            panda_fsms.append(panda_fsm)
 
         close_viewer = False
         all_done = False
@@ -485,57 +386,38 @@ class GraspEvaluator:
 
         while (not close_viewer) and (not all_done): 
 
-            # frame_count += 1
-            # if frame_count == 2:
-            # #     output_file = "/home/baothach/Downloads/test_cam_views.png"
-            # #     visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-            # #                         resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+            frame_count += 1
+            if frame_count == 2:
+                output_file = "/home/baothach/Downloads/test_cam_views.png"
+                # visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+                #                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
-            # #     get_object_particle_state(self.gym,self.sim,vis=True)
-            # #     start_time = timeit.default_timer()
-            # #     get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], self.cam_handles[0], self.pc_cam_props, robot_segmentationId=11, object_name="deformable", color=None, min_z=-0.005, visualization=True, device="cpu")
-            # #     print("Rendering time:", timeit.default_timer()-start_time)
+                static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
+                os.makedirs(static_data_recording_path, exist_ok=True)
+                segmentationId_dict = {"robot": 11}
+                partial_pcs = []    # list of 8 point clouds from 8 different camera views
+                for cam_handle in self.cam_handles[:8]:
+                    # partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
+                    #                                             segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
+                    #                                             visualization=False, device="cpu")
+                    
+                    partial_pc = get_partial_point_cloud(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props)
+                    
+                    partial_pcs.append(deepcopy(partial_pc))
 
-            #     segmentationId_dict = {"robot": 11}
-            #     partial_pcs = []    # list of 8 point clouds from 8 different camera views
-            #     for cam_handle in self.cam_handles[:2]:
-            #         partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
-            #                                                     segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
-            #                                                     visualization=False, device="cpu")
-            #         partial_pcs.append(deepcopy(partial_pc))
+                data = {"partial_pcs": partial_pcs}
+                with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
+                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-            #     pcds = []
-            #     for pc in partial_pcs:
-            #         pcds.append(pcd_ize(pc))
-            #     open3d.visualization.draw_geometries(pcds) 
+                pcds = []
+                for pc in partial_pcs:
+                    pcds.append(pcd_ize(pc))
+                open3d.visualization.draw_geometries(pcds) 
+                
+
 
             if self.cfg['use_viewer']:
                 close_viewer = self.gym.query_viewer_has_closed(self.viewer)                        
-            
-            # If the simulation is taking too long, declare fail
-            if (timeit.default_timer() - loop_start > self.cfg['timeout']['other_modes']
-                    and panda_fsms[i].state not in ['reorient', 'squeeze_no_gravity']) or (
-                        timeit.default_timer()
-                        - loop_start > self.cfg['timeout']['squeeze_no_gravity']
-                        and panda_fsms[i].state == "squeeze_no_gravity"):
-                print("Timed out")
-                for i in range(len(self.env_handles)):
-                    if panda_fsms[i].state != "done":
-                        panda_fsms[i].state = "done"
-                        panda_fsms[i].timed_out = True
-
-            for i in range(len(self.env_handles)):
-                panda_fsms[i].update_previous_particle_state_tensor()
-
-            all_done = all(panda_fsms[i].state == 'done'
-                           for i in range(len(self.env_handles)))
-
-            self.gym.refresh_particle_state_tensor(self.sim)   
-
-
-            for i in range(len(self.env_handles)):
-                if panda_fsms[i].state != "done":
-                    panda_fsms[i].run_state_machine()
 
             # Run simulation
             self.gym.simulate(self.sim)
@@ -546,12 +428,6 @@ class GraspEvaluator:
             if self.cfg['use_viewer']:
                 self.gym.draw_viewer(self.viewer, self.sim, True)
         
-        # save measured and desired forces for debugging
-        if self.cfg['miscellaneous']['force_debug_recording_path']:            
-            recording_path = self.cfg['miscellaneous']['force_debug_recording_path'] #"visualization/recorded_forces/width_grasp"
-            os.makedirs(recording_path, exist_ok=True)
-            with open(os.path.join(recording_path, f"Kp={self.cfg['force_control']['Kp']}.pickle"), 'wb') as handle:
-                pickle.dump(panda_fsms[0].recorded_forces, handle, protocol=pickle.HIGHEST_PROTOCOL)   
 
         # Clean up
         if self.cfg['use_viewer']:
