@@ -40,6 +40,8 @@ def in_collision_with_gripper(gripper, object_mesh, poses):
     gripper_meshes = [gripper.mesh]
 
     gripper_transforms = np.array(utilities.poses_wxyz_to_mats(poses))
+    
+    # print("gripper_transforms:", len(gripper_transforms))
 
     return _in_collision(object_mesh, gripper_meshes, gripper_transforms)
 
@@ -65,9 +67,11 @@ def _in_collision(mesh_a, mesh_b, transforms_b):
         in_collision = [
             manager.in_collision_single(mesh_b, transform=t_b) for t_b in transforms_b
         ]
-
+    
+    # print("mesh_b[0]:", mesh_b[0])
+    # print(transforms_b)
     # mesh_b[0].apply_transform(transforms_b[0])
-    # scene = trimesh.Scene([mesh_a,mesh_b])
+    # scene = trimesh.Scene([mesh_a,mesh_b[0]])
     # scene.show()
 
     return np.array(in_collision, dtype=np.bool)

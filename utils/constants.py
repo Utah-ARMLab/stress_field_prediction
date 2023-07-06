@@ -1,1 +1,1 @@
-OBJECT_NAMES = ["rectangle"]
+OBJECT_NAMES = ["rectangle", "strawberry", "mustard_bottle", "rubiks_cube", "banana"]

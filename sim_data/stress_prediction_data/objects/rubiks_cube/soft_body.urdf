@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>    
 
-    <robot name="banana">
-        <link name="banana">    
+    <robot name="rubiks_cube">
+        <link name="rubiks_cube">    
             <fem>
                 <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
                 <density value="1000" />
-                <youngs value="5e4"/>
+                <youngs value="50000"/>
                 <poissons value="0.3"/>
                 <damping value="0.0" />
                 <attachDistance value="0.0"/>
-                <tetmesh filename="banana.tet"/>
+                <tetmesh filename="rubiks_cube.tet"/>
                 <scale value="1"/>
             </fem>
         </link>

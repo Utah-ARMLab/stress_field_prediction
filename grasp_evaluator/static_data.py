@@ -255,8 +255,8 @@ class StaticDataCollection:
 
         """ Camera for getting point cloud. """
         self.pc_cam_props = gymapi.CameraProperties()    
-        self.pc_cam_props.width = 256  #256
-        self.pc_cam_props.height = 256 #256
+        self.pc_cam_props.width = 1000 #256
+        self.pc_cam_props.height = 1000 #256
 
         # pc_cam_position = gymapi.Vec3(-0.1, 0.1, self.cfg['sim_params']['platform_height'] + 0.02 + 0.1)
         # pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
@@ -396,12 +396,12 @@ class StaticDataCollection:
                 os.makedirs(static_data_recording_path, exist_ok=True)
                 segmentationId_dict = {"robot": 11}
                 partial_pcs = []    # list of 8 point clouds from 8 different camera views
-                for cam_handle in self.cam_handles[:8]:
-                    # partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
-                    #                                             segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
-                    #                                             visualization=False, device="cpu")
+                for cam_handle in self.cam_handles:
+                    partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
+                                                                segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
+                                                                visualization=False, device="cpu")
                     
-                    partial_pc = get_partial_point_cloud(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props)
+                    # partial_pc = get_partial_point_cloud(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props)
                     
                     partial_pcs.append(deepcopy(partial_pc))
 

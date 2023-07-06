@@ -43,7 +43,7 @@ parser.add_argument(
     type=int,
     help="End index of vectors to test. [0, 15]")
 parser.add_argument('--density', default='1000', type=str, help="Density of object [kg/m^3]")
-parser.add_argument('--youngs', default='5e5', type=str, help="Elastic modulus of object [Pa]")
+parser.add_argument('--youngs', default='1e4', type=str, help="Elastic modulus of object [Pa]")
 parser.add_argument('--poissons', default='0.3', type=str, help="Poisson's ratio of object")
 parser.add_argument('--friction', default='0.7', type=str, help="Dynamic friction")
 parser.add_argument(

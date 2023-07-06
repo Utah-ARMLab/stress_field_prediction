@@ -3,7 +3,7 @@ import numpy as np
 import pickle5 as pickle
 import os
 
-Kp = 0.006
+Kp = 0.004
 
 grasp_orientation = "height_grasp"   # options: width_grasp, height_grasp
 

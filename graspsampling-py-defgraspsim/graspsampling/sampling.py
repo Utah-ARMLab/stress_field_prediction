@@ -525,6 +525,8 @@ def collision_free_grasps(
         tmp = sampler.sample(number_of_grasps)
         tmp_len = len(tmp["poses"])
         num_attempts += number_of_grasps
+        
+        # print("tmp:", len(tmp["poses"]))
 
         # test for collisions and content of closing region
         if env_mesh:
@@ -546,6 +548,6 @@ def collision_free_grasps(
         grasps = np.array(tmp["poses"])
         results.extend(grasps[closing_region_nonempty & ~in_collision].tolist())
         
-        # print(len(results))
+        # print(in_collision)
 
     return results[:number_of_grasps]

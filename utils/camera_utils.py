@@ -48,7 +48,7 @@ def compute_pointcloud(D_i, S_i, V_inv, P, w, h, min_z, segmentationId_dict, obj
     K = k.expand(h, -1).to(device) # shape = (h, w)
     T = t.expand(-1, w).to(device) # shape = (h, w)
 
-    U = (K - center_u)/w # image-space coordinate
+    U = -(K - center_u)/w # image-space coordinate
     V = (T - center_v)/h # image-space coordinate
 
     X2 = torch.cat([(fu*D_i*U).unsqueeze(0), (fv*D_i*V).unsqueeze(0), D_i.unsqueeze(0), torch.ones_like(D_i).unsqueeze(0).to(device)], dim=0) # deprojection vector, shape = (4, h, w)

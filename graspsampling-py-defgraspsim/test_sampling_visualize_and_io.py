@@ -26,7 +26,9 @@ import logging
 from graspsampling import collision, visualize
 import trimesh
 import numpy as np
-# np.random.seed(0)
+import os
+import transformations
+np.random.seed(0)
 
 
 def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=50, visualization=False):
@@ -37,19 +39,27 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
     object_mesh = utilities.instantiate_mesh(file=object_filename, scale=object_scale)
     print("Extents of loaded mesh:", object_mesh.extents)
 
+    # eulers = [0,np.pi/2,0]
+    # transform_mat = transformations.euler_matrix(*eulers)
+    # object_mesh.apply_transform(transform_mat)
+
     
     ### Load environment mesh
-    env_mesh = trimesh.creation.box((0.5,0.5,0.005))    # platform
-    min_z_coordinates_object = min(object_mesh.vertices[:, 2])
-    max_z_coordinates_env = max(env_mesh.vertices[:, 2])
-    env_mesh.apply_translation([0,0,min_z_coordinates_object-max_z_coordinates_env])    # shift the platform to the bottom of the object
+    # env_mesh = trimesh.creation.box((0.5,0.5,0.005))    # platform
+    # min_z_coordinates_object = min(object_mesh.vertices[:, 2])
+    # max_z_coordinates_env = max(env_mesh.vertices[:, 2])
+    # env_mesh.apply_translation([0,0,min_z_coordinates_object-max_z_coordinates_env])    # shift the platform to the bottom of the object
+    env_mesh = None
     
     ### Load panda gripper
     gripper = hands.create_gripper('panda', 0.04)   # 0.04 makes the gripper open, remove it if want to make gripper close
 
 
     ### Instantiate and run sampler (with collision checking)
-    sampler = cls_sampler(gripper, object_mesh)    
+    if cls_sampler==sampling.AntipodalSampler:
+        sampler = cls_sampler(gripper, object_mesh, number_of_orientations=6) 
+    else:
+        sampler = cls_sampler(gripper, object_mesh)    
     filtered_poses = sampling.collision_free_grasps(gripper, object_mesh, sampler, number_of_grasps, env_mesh=env_mesh)
     results = {"poses": filtered_poses}
 
@@ -73,15 +83,22 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
 if __name__ == "__main__":
 
     # fname_object = 'data/objects/banana.obj'
-    obj_name = "square"
+    obj_name = "strawberry"
     object_scale = 1
-    # fname_object = f'/home/baothach/stress_field_prediction/examples/{obj_name}/{obj_name}.obj'
-    fname_object = f'/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}.stl'
-    data_recording_path = f"/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}_grasps.h5"
+    # # fname_object = f'/home/baothach/stress_field_prediction/examples/{obj_name}/{obj_name}.obj'
+    # fname_object = f'/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}.stl'
+    # data_recording_path = f"/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}_grasps.h5"
     
-    grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=50, visualization=True)
+    mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/objects"
+    fname_object = os.path.join(mesh_main_path, obj_name, f"{obj_name}.obj")
+    data_recording_path = os.path.join(mesh_main_path, obj_name, f"{obj_name}_grasps.h5")
+    
+    grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=10, visualization=True)
     grasps["object_scale"] = object_scale
+    print("num grasps:", len(grasps["poses"]))
 
     ### Save sampled grasps to a h5 file.
     h5_writer = io.H5Writer(data_recording_path)
     h5_writer.write(**grasps)
+
+    # AntipodalSampler  SurfaceApproachSampler

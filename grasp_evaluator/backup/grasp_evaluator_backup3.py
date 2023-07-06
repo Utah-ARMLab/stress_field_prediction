@@ -164,17 +164,17 @@ class GraspEvaluator:
         sim_params.stress_visualization_max = 5e3   #1e5
 
         # Set FleX-specific parameters
-        sim_params.flex.solver_type = 5
-        sim_params.flex.num_outer_iterations = 10
-        sim_params.flex.num_inner_iterations = 200
-        sim_params.flex.relaxation = 0.75
-        sim_params.flex.warm_start = 0.8
-
         # sim_params.flex.solver_type = 5
-        # sim_params.flex.num_outer_iterations = 4
-        # sim_params.flex.num_inner_iterations = 50
+        # sim_params.flex.num_outer_iterations = 10
+        # sim_params.flex.num_inner_iterations = 200
         # sim_params.flex.relaxation = 0.75
         # sim_params.flex.warm_start = 0.8
+
+        sim_params.flex.solver_type = 5
+        sim_params.flex.num_outer_iterations = 4
+        sim_params.flex.num_inner_iterations = 50
+        sim_params.flex.relaxation = 0.75
+        sim_params.flex.warm_start = 0.8
 
         sim_params.flex.deterministic_mode = True
 
@@ -236,7 +236,7 @@ class GraspEvaluator:
         self.asset_handle_franka = self.gym.load_asset(self.sim, asset_root, self.franka_urdf,
                                                        asset_options)
 
-        asset_options.fix_base_link = True  #False
+        asset_options.fix_base_link = False
         asset_options.min_particle_mass = 1e-20
         asset_options.disable_gravity = True    # no gravity on deformable object
         self.asset_handle_object = self.gym.load_asset(self.sim, asset_root, asset_file_object,

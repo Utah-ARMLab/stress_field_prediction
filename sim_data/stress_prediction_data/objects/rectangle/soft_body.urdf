@@ -8,7 +8,6 @@
             <damping value="0.0" />
             <attachDistance value="0.0" />
             <tetmesh filename="rectangle.tet" />
-            <scale value="1"/>
         </fem>
     </link>
 </robot>

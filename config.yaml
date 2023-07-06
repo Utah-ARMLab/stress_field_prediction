@@ -13,7 +13,7 @@ tags:
 force_control:
   # Kp: 0.002
   # min_torque: -0.05
-  Kp: 0.006
+  Kp: 0.004
   min_torque: -0.05
 
 dir:
