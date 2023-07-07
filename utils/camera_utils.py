@@ -26,7 +26,7 @@ def compute_pointcloud(D_i, S_i, V_inv, P, w, h, min_z, segmentationId_dict, obj
     P = P.to(device)
 
     if object_name == "deformable":
-        all_segmentationIds = [item for item in segmentationId_dict.items()]
+        all_segmentationIds = list(segmentationId_dict.values())       
         for segmentationId in all_segmentationIds:
             D_i[S_i == segmentationId] = -10001  # Ignore any points from robot and other rigid objects.
    

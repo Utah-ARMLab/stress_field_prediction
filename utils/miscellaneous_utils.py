@@ -83,3 +83,22 @@ def scalar_to_rgb(scalar_list, colormap='jet', min_val=None, max_val=None):
     cmap = plt.cm.get_cmap(colormap)
     rgb = cmap(norm(scalar_list))
     return rgb
+
+
+RESET = "\033[0m"
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+
+def print_color(text, color="red"):
+    if color == "red":
+        print(RED + text + RESET)
+    elif color == "green":
+        print(GREEN + text + RESET)
+    elif color == "yellow":
+        print(YELLOW + text + RESET)
+    elif color == "blue":
+        print(BLUE + text + RESET)
+    else:
+        print(text)

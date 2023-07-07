@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
-from utils.miscellaneous_utils import get_object_particle_state, pcd_ize 
+from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color 
 from utils.camera_utils import *
 from isaacgym import gymtorch
 import pickle
@@ -50,7 +50,7 @@ class GraspEvaluator:
             self.cfg = yaml.safe_load(yamlfile)
 
 
-        print("Using z-up convention ===========xxxxxxxxxxxx")
+        print_color("Using z-up convention ===========xxxxxxxxxxxx")
 
         # Soft object material parameters
         self.object_name = object_name.lower()
@@ -69,6 +69,7 @@ class GraspEvaluator:
         
         sim_data_main_path = os.path.abspath("sim_data/stress_prediction_data")
         self.assets_dir = os.path.join(sim_data_main_path, self.cfg['dir']['assets_dir'])
+        self.platform_asset_dir = os.path.join(sim_data_main_path, "objects")
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
@@ -139,7 +140,7 @@ class GraspEvaluator:
         # self.grasp_candidate_poses = f['poses'][1:2]  # width grasp
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
         
-        self.object_scale = f['object_scale'][()]
+        self.object_scale = 1#f['object_scale'][()]
         print("Object scale:", self.object_scale )
         
         f.close() 
@@ -164,17 +165,17 @@ class GraspEvaluator:
         sim_params.stress_visualization_max = 5e3   #1e5
 
         # Set FleX-specific parameters
-        sim_params.flex.solver_type = 5
-        sim_params.flex.num_outer_iterations = 10
-        sim_params.flex.num_inner_iterations = 200
-        sim_params.flex.relaxation = 0.75
-        sim_params.flex.warm_start = 0.8
-
         # sim_params.flex.solver_type = 5
-        # sim_params.flex.num_outer_iterations = 4
-        # sim_params.flex.num_inner_iterations = 50
+        # sim_params.flex.num_outer_iterations = 10
+        # sim_params.flex.num_inner_iterations = 200
         # sim_params.flex.relaxation = 0.75
         # sim_params.flex.warm_start = 0.8
+
+        sim_params.flex.solver_type = 5
+        sim_params.flex.num_outer_iterations = 4
+        sim_params.flex.num_inner_iterations = 50
+        sim_params.flex.relaxation = 0.75
+        sim_params.flex.warm_start = 0.8
 
         sim_params.flex.deterministic_mode = True
 
@@ -227,7 +228,7 @@ class GraspEvaluator:
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_VEL
 
         # Load Franka and object assets
-        asset_file_platform = os.path.join(self.assets_dir, 'platform.urdf')
+        asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
         asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
 
 

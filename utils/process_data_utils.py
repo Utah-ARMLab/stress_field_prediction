@@ -1,6 +1,7 @@
 import sys
 from utils.graspsampling_utilities import poses_wxyz_to_mats
 from utils.hands import create_gripper
+from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb
 import trimesh
 import torch
 import open3d
@@ -36,11 +37,10 @@ def get_stress_query_points(model, device, query_list, augmented_partial_pc, aug
 
     return torch.cat(tuple(outputs), dim=0).squeeze().cpu().detach().numpy()
 
-def get_stress_occupancy_query_points(model, device, query_list, augmented_partial_pc, augmented_aps, batch_size, occupancy_threshold):
+def get_stress_occupancy_query_points(model, device, query_list, combined_pc, batch_size, occupancy_threshold):
     """ 
     query_list: np array, list of query points. Shape (num_qrs, 3). 
-    augmented_partial_pc: partial pc with one-hot encoding. Shape (1024, 6).
-    augmented_aps: attachment points with one-hot encoding. Shape (100, 6).
+    combined_pc: augmented partial pc concatenated with gripper pc. Shape (1024+1024, 5).
  
     Returns: (O1, O2, O3)
     O1: np array, list of predicted stress scalars at each query points. Shape (num_qrs,).   
@@ -50,7 +50,6 @@ def get_stress_occupancy_query_points(model, device, query_list, augmented_parti
     
     num_qrs = query_list.shape[0]
     queries_tensor = torch.from_numpy(query_list).float().to(device)  # shape (num_qrs, 3)
-    combined_pc = np.concatenate((augmented_partial_pc, augmented_aps), axis=0)
     combined_pc_tensor = torch.from_numpy(combined_pc).float().permute(1,0).unsqueeze(0).repeat(num_qrs,1,1).to(device)    # shape (num_qrs,6,1024)
 
     with torch.no_grad():
@@ -71,6 +70,10 @@ def get_stress_occupancy_query_points(model, device, query_list, augmented_parti
     return all_stresses, all_occupancies, occupied_idxs
 
 def sample_points_bounding_box(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], seed=None):
+    """ 
+    Sample points from the bounding box of the object mesh.
+    """
+
     if seed is not None:
         np.random.seed(seed)
 
@@ -137,3 +140,42 @@ def sample_and_compute_signed_distance(tri_indices, full_pc, boundary_threshold,
         open3d.visualization.draw_geometries(pcds)     
         
     return queries, outside_mesh_idxs
+
+
+def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_threshold, full_pc, 
+                             combined_pc, query_type, num_query_pts=None, 
+                             stress_visualization_bounds=None, return_open3d_object=False):
+    if query_type == "sampled": # sampled from bounding box
+        sampled_points, outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
+                                        boundary_threshold=[0.02,-0.01], \
+                                        num_pts=num_query_pts, scales=[1.5, 1.5, 1.5], vis=False, seed=None, verbose=False)  
+        predicted_stresses_log, predicted_occupancies, occupied_idxs = \
+                                get_stress_occupancy_query_points(model, device, query_list=sampled_points, 
+                                                                  combined_pc=combined_pc,
+                                                                  batch_size=batch_size, occupancy_threshold=occupancy_threshold)
+        print("occupied_idxs.shape:", occupied_idxs.shape)
+        selected_points = sampled_points[occupied_idxs] # select points that belong to the volume of the object (occupied)
+        selected_stresses_log = predicted_stresses_log[occupied_idxs]
+
+    elif query_type == "full":   # use object particles ("full_pc")
+        predicted_stresses_log, predicted_occupancies, occupied_idxs = \
+                                get_stress_occupancy_query_points(model, device, query_list=full_pc, 
+                                                                  combined_pc=combined_pc,
+                                                                  batch_size=batch_size, occupancy_threshold=occupancy_threshold)
+        selected_points = full_pc
+        selected_stresses_log = predicted_stresses_log
+
+    if not return_open3d_object:
+        return selected_points
+    else:
+        pcd_stress_field = pcd_ize(selected_points)
+        if stress_visualization_bounds is None:
+            stress_field_colors = np.array(scalar_to_rgb(selected_stresses_log, colormap='jet'))[:,:3]
+        else:
+            stress_field_colors = np.array(scalar_to_rgb(
+                selected_stresses_log, colormap='jet', 
+                min_val=stress_visualization_bounds[0], max_val=stress_visualization_bounds[1]))[:,:3]
+            
+        pcd_stress_field.colors = open3d.utility.Vector3dVector(stress_field_colors)        
+
+        return pcd_stress_field

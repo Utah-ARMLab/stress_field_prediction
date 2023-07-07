@@ -27,7 +27,7 @@ from isaacgym import gymtorch
 
 from utils import panda_fk
 from utils import tet_based_metrics
-from utils.miscellaneous_utils import record_data_stress_prediction
+from utils.miscellaneous_utils import record_data_stress_prediction, print_color 
 # import open3d
 import pickle
 import os
@@ -997,7 +997,9 @@ class PandaFsm:
                 self.left_has_contacted, self.right_has_contacted = False, False
                 print(self.env_id, "Forces too high during close_soft, resetting state",
                       np.sum(F_curr[1:]))
-                self.reset_saved_state()
+                self.state = "done"
+
+                # self.reset_saved_state()
 
             force_threshold = 0.005
             if self.mode == "squeeze_no_gravity":
@@ -1092,11 +1094,13 @@ class PandaFsm:
                 force_too_high = True
             if force_too_high:
                 print("Squeezing force too high, reset")
-                self.squeezing_close_fails += 1
-                if self.squeezing_close_fails > 4:
-                    self.state = "done"
-                else:
-                    self.reset_saved_state()
+                self.state = "done"
+
+                # self.squeezing_close_fails += 1
+                # if self.squeezing_close_fails > 4:
+                #     self.state = "done"
+                # else:
+                #     self.reset_saved_state()
 
 
             # 2. Detect whether contact has been lost for a while
@@ -1107,35 +1111,41 @@ class PandaFsm:
 
             if self.squeeze_lost_contact_counter > 100:
                 print("Lost contact during squeezing, reset")
-                self.squeezing_close_fails += 1
-                self.squeeze_lost_contact_counter = 0
-                if self.squeezing_close_fails > 4:
-                    self.state = "done"
-                else:
-                    self.reset_saved_state()
+                self.state = "done"
+
+                # self.squeezing_close_fails += 1
+                # self.squeeze_lost_contact_counter = 0
+                # if self.squeezing_close_fails > 4:
+                #     self.state = "done"
+                # else:
+                #     self.reset_saved_state()
 
             # 3. Detect whether object is no longer between grippers
             if self.franka_dof_states['pos'][-3:][
                     1] < 0.0001 and self.franka_dof_states['pos'][-3:][
                         2] < 0.0001:
                 print("Can't close that tightly during squeezing, reset") 
-                self.squeezing_close_fails += 1
-                self.squeezing_no_grasp += 1
-                if self.squeezing_close_fails > 4 or self.squeezing_no_grasp > 2:
-                    self.state = "done"
-                else:
-                    self.reset_saved_state()
+                self.state = "done"
+
+                # self.squeezing_close_fails += 1
+                # self.squeezing_no_grasp += 1
+                # if self.squeezing_close_fails > 4 or self.squeezing_no_grasp > 2:
+                #     self.state = "done"
+                # else:
+                #     self.reset_saved_state()
 
             # 4. Detect whether grippers have exceeded joint limits
             # (occurs when there are spikes in force readings-> spikes in torque responses)
             if self.franka_dof_states['pos'][-3:][
                     1] > 0.04 or self.franka_dof_states['pos'][-3:][2] > 0.04:
                 print(self.env_id, "Grippers exceeded joint limits, reset")
-                self.squeezing_close_fails += 1
-                if self.squeezing_close_fails > 4:
-                    self.state = "done"
-                else:
-                    self.reset_saved_state()
+                self.state = "done"
+
+                # self.squeezing_close_fails += 1
+                # if self.squeezing_close_fails > 4:
+                #     self.state = "done"
+                # else:
+                #     self.reset_saved_state()
 
             ############################################################
             # DETECT STATE TRANSITION WHEN SQUEEZING FORCES ARE MET

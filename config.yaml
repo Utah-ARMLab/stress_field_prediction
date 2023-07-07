@@ -13,11 +13,11 @@ tags:
 force_control:
   # Kp: 0.002
   # min_torque: -0.05
-  Kp: 0.004
+  Kp: 0.002
   min_torque: -0.05
 
 dir:
-  assets_dir: 'objects'
+  assets_dir: dgn_dataset  #'objects'
   franka_urdf: 'franka_description/robots/franka_panda_fem_simple_v4_with_arm.urdf'
   results_dir: 'results' 
 

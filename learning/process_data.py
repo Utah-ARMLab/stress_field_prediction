@@ -22,14 +22,26 @@ os.makedirs(data_processed_path, exist_ok=True)
 
 data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
-visualization = True
+visualization = False
 num_pts = 1024
 num_query_pts = 5
 
 grasp_idx_bounds = [0, 1]
 force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
 
-for object_name in OBJECT_NAMES:
+for object_name in OBJECT_NAMES[0:1]:
+
+    get_gripper_pc = True
+
+    # Get adjacent tetrahdras of each vertex
+    with open(os.path.join(adjacent_tetrahedrals_save_path, f"{object_name}.pickle"), 'rb') as handle:
+        adjacent_tetrahedral_dict = pickle.load(handle)   
+
+    with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
+        static_data = pickle.load(handle)
+    partial_pcs = static_data["partial_pcs"][1:2]  # list of 8 point clouds from 8 different camera views
+    partial_pcs = [down_sampling(pc, num_pts=num_pts) for pc in partial_pcs]
+
     for i in range(*grasp_idx_bounds):        
         print(f"{object_name} - grasp {i} started. Time passed: {timeit.default_timer() - start_time}")
         
@@ -53,24 +65,20 @@ for object_name in OBJECT_NAMES:
             grasp_pose = data["grasp_pose"]
             fingers_joint_angles = data["fingers_joint_angles"]
 
-            # Get adjacent tetrahdras of each vertex
-            with open(os.path.join(adjacent_tetrahedrals_save_path, f"{object_name}.pickle"), 'rb') as handle:
-                adjacent_tetrahedral_dict = pickle.load(handle)   
+            
 
-            with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
-                static_data = pickle.load(handle)
-            partial_pcs = static_data["partial_pcs"][1:2]  # list of 8 point clouds from 8 different camera views
-            partial_pcs = [down_sampling(pc, num_pts=num_pts) for pc in partial_pcs]
-            
-            augmented_partial_pcs = [np.hstack((pc, np.tile(np.array([force, young_modulus]), (pc.shape[0], 1))))
-                                    for pc in partial_pcs]  # list of 8 arrays of shape (num_pts,5)
                 
-            gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
-            augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), (gripper_pc.shape[0], 1))))
-            
-            # Combine everything together to get an augmented point cloud of shape (num_pts*2,5)
-            combined_pcs = [np.concatenate((pc, augmented_gripper_pc), axis=0)
-                            for pc in augmented_partial_pcs]  # list of 8 arrays of shape (num_pts + num_pts, 5)
+            if get_gripper_pc:
+                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
+                augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), (gripper_pc.shape[0], 1))))
+                get_gripper_pc = False
+
+                augmented_partial_pcs = [np.hstack((pc, np.tile(np.array([force, young_modulus]), (pc.shape[0], 1))))
+                                        for pc in partial_pcs]  # list of 8 arrays of shape (num_pts,5)
+
+                # Combine everything together to get an augmented point cloud of shape (num_pts*2,5)
+                combined_pcs = [np.concatenate((pc, augmented_gripper_pc), axis=0)
+                                for pc in augmented_partial_pcs]  # list of 8 arrays of shape (num_pts + num_pts, 5)
             
             
             if visualization:
@@ -89,45 +97,45 @@ for object_name in OBJECT_NAMES:
                 open3d.visualization.draw_geometries([pcd_partial.translate((0.1,0,0)), pcd_full, pcd_gripper])
 
 
-            # # Points belongs the object volume
-            # full_pc = object_particle_state
-            # selected_idxs = np.random.randint(low=0, high=full_pc.shape[0], size=num_query_pts)
-            # for idx in selected_idxs:
-            #     query_point = full_pc[idx]
-            #     stress = compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx=idx)
-            #     stress_log = np.log(stress)
+            # Points belongs the object volume
+            full_pc = object_particle_state
+            selected_idxs = np.random.randint(low=0, high=full_pc.shape[0], size=num_query_pts)
+            for idx in selected_idxs:
+                query_point = full_pc[idx]
+                stress = compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx=idx)
+                stress_log = np.log(stress)
 
-            #     for combined_pc in combined_pcs:
-            #         # Save data
-            #         processed_data = {"combined_pc": combined_pc.transpose(1,0),
-            #                         "stress": stress, "stress_log": stress_log, 
-            #                         "occupancy": 1, 
-            #                         "query_point": query_point, "object_name": object_name}
+                for combined_pc in combined_pcs:
+                    # Save data
+                    processed_data = {"combined_pc": combined_pc.transpose(1,0),
+                                    "stress": stress, "stress_log": stress_log, 
+                                    "occupancy": 1, 
+                                    "query_point": query_point, "object_name": object_name}
                     
-            #         with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-            #             pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+                    with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+                        pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
                         
-            #         data_point_count += 1
+                    data_point_count += 1
 
-            # # Random points (outside object mesh)   
-            # sampled_points, outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
-            #                                 boundary_threshold=[0.02,-0.01], \
-            #                                 num_pts=num_query_pts, scales=(2, 2, 4), vis=visualization, seed=None, verbose=False)      
+            # Random points (outside object mesh)   
+            sampled_points, outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
+                                            boundary_threshold=[0.02,-0.01], \
+                                            num_pts=num_query_pts, scales=[1.5, 1.5, 1.5], vis=visualization, seed=None, verbose=False)      
             
-            # for idx in outside_mesh_idxs:
-            #     query_point = sampled_points[idx]
+            for idx in outside_mesh_idxs:
+                query_point = sampled_points[idx]
 
-            #     for combined_pc in combined_pcs:
-            #         # Save data
-            #         processed_data = {"combined_pc": combined_pc.transpose(1,0),
-            #                         "stress": 0, "stress_log": -4, 
-            #                         "occupancy": 0, 
-            #                         "query_point": query_point, "object_name": object_name}
+                for combined_pc in combined_pcs:
+                    # Save data
+                    processed_data = {"combined_pc": combined_pc.transpose(1,0),
+                                    "stress": 0, "stress_log": -4, 
+                                    "occupancy": 0, 
+                                    "query_point": query_point, "object_name": object_name}
                     
-            #         with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-            #             pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+                    with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+                        pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
                         
-            #         data_point_count += 1        
+                    data_point_count += 1        
         
         
         

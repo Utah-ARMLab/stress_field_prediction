@@ -13,9 +13,9 @@ data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/d
 os.makedirs(adjacent_tetrahedrals_save_path, exist_ok=True)
 
 
-for object_name in OBJECT_NAMES:
-    
-    file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{0}_force_{1}.pickle")
+# for object_name in OBJECT_NAMES:
+for object_name in ["strawberry"]:
+    file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{0}_force_{1.0}.pickle")
     if not os.path.isfile(file_name):
         print(f"{file_name} not found")
         break 

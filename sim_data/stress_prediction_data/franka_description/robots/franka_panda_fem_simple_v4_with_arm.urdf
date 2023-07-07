@@ -249,12 +249,12 @@
 	<link name="panda_hand">
     		<visual>
       			<geometry>
-        			<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/visual/hand.obj"/>
+        			<mesh filename="meshes/visual/hand.obj"/>
       			</geometry>
     		</visual>
     		<collision>
       			<geometry>
-        			<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/visual/hand.obj"/>
+        			<mesh filename="meshes/visual/hand.obj"/>
       			</geometry>
     		</collision>
 		<inertial>
@@ -285,13 +285,13 @@
 		<visual>
 			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
 			<geometry>
-		        	<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/custom/full_fillet_finger.obj"/>
+		        	<mesh filename="meshes/custom/full_fillet_finger.obj"/>
       			</geometry>
     		</visual>
     		<collision>
 			<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
       			<geometry>
-		        	<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/custom/full_fillet_finger.obj"/>
+		        	<mesh filename="meshes/custom/full_fillet_finger.obj"/>
       			</geometry>
     		</collision>
 		<inertial>
@@ -303,13 +303,13 @@
 		<visual>
 			<origin rpy="0.0 0.0 3.14159265359" xyz="0.0 0.0 0.0"/>
 			<geometry>
-		        	<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/custom/full_fillet_finger.obj"/>
+		        	<mesh filename="meshes/custom/full_fillet_finger.obj"/>
       			</geometry>
     		</visual>
     		<collision>
 			<origin rpy="0.0 0.0 3.14159265359" xyz="0.0 0.0 0.0"/>
       			<geometry>
-		        	<mesh filename="/home/baothach/sim_data/stress_prediction_data/franka_description/meshes/custom/full_fillet_finger.obj"/>        			
+		        	<mesh filename="meshes/custom/full_fillet_finger.obj"/>        			
       			</geometry>
 		</collision>
 		<inertial>

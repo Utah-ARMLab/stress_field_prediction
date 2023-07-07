@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
-from utils.miscellaneous_utils import get_object_particle_state, pcd_ize 
+from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color
 from utils.camera_utils import *
 from isaacgym import gymtorch
 import pickle
@@ -154,7 +154,8 @@ class StaticDataCollection:
         # sim_params.gravity = gymapi.Vec3(0.0, -9.81, 0.0)
 
         sim_params.up_axis = gymapi.UP_AXIS_Z
-        sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.8)
+        # sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.8)
+        sim_params.gravity = gymapi.Vec3(0.0, 0.0, 0.0)
 
 
         # Set stress visualization parameters
@@ -369,7 +370,7 @@ class StaticDataCollection:
 
             platform_handle = self.gym.create_actor(env_handle, self.asset_handle_platform,
                                                     pose, f"platform_{i}",
-                                                    collision_group, 1)
+                                                    collision_group, 1, segmentationId=12)
             self.platform_handles.append(platform_handle)
 
 
@@ -394,11 +395,11 @@ class StaticDataCollection:
 
                 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
                 os.makedirs(static_data_recording_path, exist_ok=True)
-                segmentationId_dict = {"robot": 11}
+                segmentationId_dict = {"robot": 11, "platform": 12}
                 partial_pcs = []    # list of 8 point clouds from 8 different camera views
                 for cam_handle in self.cam_handles:
                     partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
-                                                                segmentationId_dict, object_name="deformable", color=None, min_z=-0.005, 
+                                                                segmentationId_dict, object_name="deformable", color=None, min_z=-50.005, 
                                                                 visualization=False, device="cpu")
                     
                     # partial_pc = get_partial_point_cloud(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props)
@@ -409,10 +410,10 @@ class StaticDataCollection:
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-                pcds = []
-                for pc in partial_pcs:
-                    pcds.append(pcd_ize(pc))
-                open3d.visualization.draw_geometries(pcds) 
+                # pcds = []
+                # for pc in partial_pcs:
+                #     pcds.append(pcd_ize(pc))
+                # open3d.visualization.draw_geometries(pcds) 
                 
 
 
