@@ -83,7 +83,7 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
 if __name__ == "__main__":
 
     # fname_object = 'data/objects/banana.obj'
-    obj_name = "strawberry"
+    obj_name = "mustard_bottle"
     object_scale = 1
     # # fname_object = f'/home/baothach/stress_field_prediction/examples/{obj_name}/{obj_name}.obj'
     # fname_object = f'/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}.stl'
@@ -93,12 +93,12 @@ if __name__ == "__main__":
     fname_object = os.path.join(mesh_main_path, obj_name, f"{obj_name}.obj")
     data_recording_path = os.path.join(mesh_main_path, obj_name, f"{obj_name}_grasps.h5")
     
-    grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=10, visualization=True)
+    grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=3, visualization=True)
     grasps["object_scale"] = object_scale
     print("num grasps:", len(grasps["poses"]))
 
-    ### Save sampled grasps to a h5 file.
-    h5_writer = io.H5Writer(data_recording_path)
-    h5_writer.write(**grasps)
+    # ### Save sampled grasps to a h5 file.
+    # h5_writer = io.H5Writer(data_recording_path)
+    # h5_writer.write(**grasps)
 
     # AntipodalSampler  SurfaceApproachSampler

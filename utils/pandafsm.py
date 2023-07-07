@@ -1229,7 +1229,7 @@ class PandaFsm:
 
         if self.state == "done":
             self.vel_des = np.zeros(self.cfg['franka']['num_joints'])
-            print("DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!")            
+            print_color("DONE!!!!!!!!!!!!!!!!!!!!!!!!!!!!")            
             
 
         # Apply desired velocity targets
