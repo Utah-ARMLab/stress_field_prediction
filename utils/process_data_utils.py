@@ -69,7 +69,7 @@ def get_stress_occupancy_query_points(model, device, query_list, combined_pc, ba
 
     return all_stresses, all_occupancies, occupied_idxs
 
-def sample_points_bounding_box(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], seed=None):
+def sample_points_bounding_box(object, num_pts, scales=[1.5, 1.5, 1.5], seed=None):
     """ 
     Sample points from the bounding box of the object mesh.
     """
@@ -77,12 +77,17 @@ def sample_points_bounding_box(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], see
     if seed is not None:
         np.random.seed(seed)
 
-    # Get the bounding box of the mesh
-    bbox = object_mesh.bounding_box
+    if isinstance(object, trimesh.Trimesh):
+        # Get the bounding box of the mesh
+        bbox = object.bounding_box
 
-    # Get the minimum and maximum coordinates of the bounding box
-    min_coords = bbox.bounds[0]
-    max_coords = bbox.bounds[1]
+        # Get the minimum and maximum coordinates of the bounding box
+        min_coords = bbox.bounds[0]
+        max_coords = bbox.bounds[1]
+    
+    elif isinstance(object, trimesh.PointCloud):
+        min_coords = object.bounds[0]
+        max_coords = object.bounds[1]        
 
     # Calculate the dimensions of the bounding box
     dimensions = max_coords - min_coords
@@ -179,3 +184,76 @@ def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_t
         pcd_stress_field.colors = open3d.utility.Vector3dVector(stress_field_colors)        
 
         return pcd_stress_field
+
+def Tetrahedron(vertices):
+    """
+    Given a list of the xyz coordinates of the vertices of a tetrahedron, 
+    return tetrahedron coordinate system
+    """
+    origin, *rest = vertices
+    mat = (np.array(rest) - origin).T
+    tetra = np.linalg.inv(mat)
+    # print("tetra, origin", tetra, origin)
+    return tetra, origin
+
+def pointInside(point, tetra, origin):
+    """
+    Takes a single point or array of points, as well as tetra and origin objects returned by 
+    the Tetrahedron function.
+    Returns a boolean or boolean array indicating whether the point is inside the tetrahedron.
+    """
+    # print("mat.shape", tetra.shape, (point-origin).shape)
+    newp = np.matmul(tetra, (point-origin).T).T
+    # print("newp:", newp.shape)
+    # print("newp", newp)
+    # print("newp>=0", newp>=0)
+    return np.all(newp>=0, axis=-1) & np.all(newp <=1, axis=-1) & (np.sum(newp, axis=-1) <=1)
+
+def Tetrahedron_vectorized(vertices):
+    """
+    Given a list of the xyz coordinates of the vertices of a tetrahedron, 
+    return tetrahedron coordinate system
+    """
+    origin = vertices[:,:1,:]
+    rest = vertices[:,1:,:]
+    mat = (np.array(rest) - origin)
+    tetra = np.linalg.inv(mat)
+    # print("tetra, origin", tetra.transpose((0,2,1)), origin.transpose((0,2,1)))
+    return tetra.transpose((0,2,1)), origin
+
+def pointInside_vectorized(point, tetra, origin):
+    """
+    Takes a single point or array of points, as well as tetra and origin objects returned by 
+    the Tetrahedron function.
+    Returns a boolean or boolean array indicating whether the point is inside the tetrahedron.
+    """
+    # print("mat.shape", tetra.shape, (point-origin).shape)
+    newp = np.matmul(tetra, (point-origin).transpose((0,2,1))).transpose((0,2,1))
+    # print("newp:", newp.shape)
+    # print("newp", newp)
+    # print("newp>=0", newp>=0)
+    return np.all(newp>=0, axis=-1) & np.all(newp <=1, axis=-1) & (np.sum(newp, axis=-1) <=1)
+
+def is_point_inside_mesh(points, vertices, tetrahedra):
+    insides = [False for _ in range(points.shape[0])]
+    for tetra in tetrahedra:
+        v = [vertices[tetra[0]], vertices[tetra[1]], vertices[tetra[2]], vertices[tetra[3]]]
+        print("np.array(v).shape:", np.array(v).shape)
+        tetra, origin = Tetrahedron(v)
+        inside_tetra = pointInside(points, tetra, origin)
+        insides = np.logical_or(insides, inside_tetra)
+        
+    return insides
+
+def is_inside_tet_mesh_vectorized(points, vertices, tet_indices):
+    """ 
+    Whether a set of points belong to the tetrahedral mesh volume.
+    Original implementation: https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/60745339#60745339      
+    """
+    v = vertices[tet_indices]
+    tetra, origin = Tetrahedron_vectorized(v)            
+    insides = pointInside_vectorized(points, tetra, origin).squeeze()   # shape (num_tetra, points.shape[0])
+
+    insides = np.any(insides, axis=0)   # shape (points.shape[0],)
+    
+    return insides

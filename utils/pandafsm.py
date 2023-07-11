@@ -893,7 +893,7 @@ class PandaFsm:
             self.mg = 9.81 * object_volume * self.density
             # self.desired_force = self.FOS * 9.81 \
             #     * object_volume * self.density / self.object_cof    * 100
-            self.desired_force = 1.0
+            self.desired_force = 14#1.0
             # self.FOS /= 100
 
 
@@ -1156,7 +1156,7 @@ class PandaFsm:
                 self.inferred_rot_force_counter > 30)
 
 
-            # print("============= F_des, F_curr, F_err, self.f_errs:", F_des, F_curr, F_err, self.f_errs, np.all(np.abs(self.f_errs) < 0.05 * self.desired_force))
+            # # print("============= F_des, F_curr, F_err, self.f_errs:", F_des, F_curr, F_err, self.f_errs, np.all(np.abs(self.f_errs) < 0.05 * self.desired_force))
             # print("\n")
             print("============= F_des, F_curr, np.abs(F_des-F_curr):", F_des, F_curr, np.abs(F_des-F_curr), np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2)
 
@@ -1179,18 +1179,18 @@ class PandaFsm:
             
                 print(f"\n xxxxxx success {self.desired_force}N \n") 
 
-                if self.cfg['data_recording']['is_recording']:
-                    data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.desired_force}.pickle")
-                    record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
-                                                self.desired_force, self.grasp_pose, 
-                                                self.pre_squeeze_fingers_joint_angles,
-                                                self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
+                # if self.cfg['data_recording']['is_recording']:
+                #     data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.desired_force}.pickle")
+                #     record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
+                #                                 self.desired_force, self.grasp_pose, 
+                #                                 self.pre_squeeze_fingers_joint_angles,
+                #                                 self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
 
 
-                self.desired_force += 0.25
+                # self.desired_force += 0.25
                 
-                if self.desired_force > 15:
-                    self.state = "done"
+                # if self.desired_force > 15:
+                #     self.state = "done"
                               
 
                 # if self.mode == "reorient":

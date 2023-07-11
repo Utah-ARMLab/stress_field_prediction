@@ -61,6 +61,8 @@ class StaticDataCollection:
         self.poissons = poissons
         self.friction = float(friction)
         self.mode = mode.lower()
+        
+        # assert self.youngs == "5e4"
 
         # Directories of assets and results
         # self.assets_dir = os.path.abspath(self.cfg['dir']['assets_dir'])
@@ -69,6 +71,7 @@ class StaticDataCollection:
         
         sim_data_main_path = os.path.abspath("sim_data/stress_prediction_data")
         self.assets_dir = os.path.join(sim_data_main_path, self.cfg['dir']['assets_dir'])
+        self.platform_asset_dir = os.path.join(sim_data_main_path, "objects")
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
@@ -139,7 +142,7 @@ class StaticDataCollection:
         # self.grasp_candidate_poses = f['poses'][1:2]  # width grasp
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
         
-        self.object_scale = f['object_scale'][()]
+        self.object_scale = 1   #f['object_scale'][()]
         print("Object scale:", self.object_scale )
         
         f.close() 
@@ -227,7 +230,7 @@ class StaticDataCollection:
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_VEL
 
         # Load Franka and object assets
-        asset_file_platform = os.path.join(self.assets_dir, 'platform.urdf')
+        asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
         asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
 
 
@@ -267,9 +270,17 @@ class StaticDataCollection:
         #     self.cam_handles.append(self.gym.create_camera_sensor(env, self.pc_cam_props))
         #     self.gym.set_camera_location(self.cam_handles[i], env, pc_cam_position, pc_cam_target)
 
-        cam_pos_z = self.cfg['sim_params']['platform_height'] + 0.03
-        cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 0.5
-        cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 0.5
+        cam_pos_z = self.max_z_object + 0.03 #self.cfg['sim_params']['platform_height'] + 0.03
+        
+        if self.object_name in [f"cuboid0{j}" for j in [4,5]]:
+            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2
+            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 2     
+        elif self.object_name in ["cuboid06"]:
+            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2.5
+            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 2.5                   
+        else:
+            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) #* 0.5
+            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) #* 0.5
         
         pc_cam_positions = []
         pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
@@ -313,6 +324,7 @@ class StaticDataCollection:
             sp = ml.split(" ")
             if sp[0] == 'v':
                 zs.append(float(sp[3]))
+        self.max_z_object = max(zs)
         return 2 * abs(min(zs))
 
     def setup_scene(self):
@@ -373,7 +385,7 @@ class StaticDataCollection:
                                                     collision_group, 1, segmentationId=12)
             self.platform_handles.append(platform_handle)
 
-
+            # self.height_of_object = height_of_object
 
     def run_simulation(self):
         """Perform grasp evaluation."""
@@ -389,9 +401,12 @@ class StaticDataCollection:
 
             frame_count += 1
             if frame_count == 2:
-                output_file = "/home/baothach/Downloads/test_cam_views.png"
-                # visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-                #                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+                # output_file = "/home/baothach/Downloads/test_cam_views.png"
+                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}_views.png"
+
+                
+                visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
                 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
                 os.makedirs(static_data_recording_path, exist_ok=True)
@@ -400,20 +415,20 @@ class StaticDataCollection:
                 for cam_handle in self.cam_handles:
                     partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
                                                                 segmentationId_dict, object_name="deformable", color=None, min_z=-50.005, 
-                                                                visualization=False, device="cpu")
-                    
-                    # partial_pc = get_partial_point_cloud(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props)
-                    
+                                                                visualization=False, device="cpu")                   
                     partial_pcs.append(deepcopy(partial_pc))
 
                 data = {"partial_pcs": partial_pcs}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-                # pcds = []
-                # for pc in partial_pcs:
-                #     pcds.append(pcd_ize(pc))
-                # open3d.visualization.draw_geometries(pcds) 
+                # # pcds = []
+                # # for pc in partial_pcs:
+                # #     pcds.append(pcd_ize(pc))
+                # # open3d.visualization.draw_geometries(pcds) 
+
+
+                all_done = True
                 
 
 

@@ -1,22 +1,54 @@
 import open3d
 import numpy as np
 from copy import deepcopy
-from utils.farthest_point_sampling import *
+# from utils.farthest_point_sampling import *
 import trimesh
 import transformations
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
-import torch
-from isaacgym import gymapi
 import pickle
-from isaacgym import gymtorch
-from utils.camera_utils import get_partial_pointcloud_vectorized
 
 
-def down_sampling(pc, num_pts=1024):
-    farthest_indices,_ = farthest_point_sampling(pc, num_pts)
-    pc = pc[farthest_indices.squeeze()]  
-    return pc
+
+def down_sampling(pc, num_pts=1024, return_indices=False):
+    # farthest_indices,_ = farthest_point_sampling(pc, num_pts)
+    # pc = pc[farthest_indices.squeeze()]  
+    # return pc
+
+    """
+    Input:
+        pc: pointcloud data, [B, N, D] where B= num batches, N=num points, D=feature size (typically D=3)
+        num_pts: number of samples
+    Return:
+        centroids: sampled pointcloud index, [num_pts, D]
+    """
+
+    if pc.ndim == 2:
+        # insert batch_size axis
+        pc = deepcopy(pc)[None, ...]
+
+    B, N, D = pc.shape
+    xyz = pc[:, :,:3]
+    centroids = np.zeros((B, num_pts))
+    distance = np.ones((B, N)) * 1e10
+    farthest = np.random.uniform(low=0, high=N, size=(B,)).astype(np.int32)
+
+    for i in range(num_pts):
+        centroids[:, i] = farthest
+        centroid = xyz[np.arange(0, B), farthest, :] # (B, D)
+        centroid = np.expand_dims(centroid, axis=1) # (B, 1, D)
+        dist = np.sum((xyz - centroid) ** 2, -1) # (B, N)
+        mask = dist < distance
+        distance[mask] = dist[mask]
+        farthest = np.argmax(distance, -1) # (B,)
+
+    pc = pc[np.arange(0, B).reshape(-1, 1), centroids.astype(np.int32), :]
+
+    if return_indices:
+        return pc.squeeze(), centroids.astype(np.int32)
+
+    return pc.squeeze()
+
 
 def pcd_ize(pc, color=None, vis=False):
     pcd = open3d.geometry.PointCloud()
@@ -31,6 +63,7 @@ def pcd_ize(pc, color=None, vis=False):
 
 
 def get_object_particle_state(gym, sim, vis=False):
+    from isaacgym import gymtorch
     gym.refresh_particle_state_tensor(sim)
     particle_state_tensor = deepcopy(gymtorch.wrap_tensor(gym.acquire_particle_state_tensor(sim)))
     particles = particle_state_tensor.numpy()[:, :3]  
@@ -85,13 +118,16 @@ def scalar_to_rgb(scalar_list, colormap='jet', min_val=None, max_val=None):
     return rgb
 
 
-RESET = "\033[0m"
-RED = "\033[31m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-BLUE = "\033[34m"
+
 
 def print_color(text, color="red"):
+
+    RESET = "\033[0m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+
     if color == "red":
         print(RED + text + RESET)
     elif color == "green":

@@ -133,11 +133,8 @@ class GraspEvaluator:
         self.grasp_candidate_poses = f['poses'][self.grasp_ind:self.grasp_ind + 1]
         self.num_grasp_poses = f['poses'].shape[0]
         print("========== Number of total grasp candidates", self.num_grasp_poses)
-        # print(self.grasp_candidate_poses)
-        
+       
 
-        # self.grasp_candidate_poses = f['poses'][0:1]  # height grasp
-        # self.grasp_candidate_poses = f['poses'][1:2]  # width grasp
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
         
         self.object_scale = 1#f['object_scale'][()]
