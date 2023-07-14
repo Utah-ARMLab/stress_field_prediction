@@ -4,28 +4,26 @@ import numpy as np
 import pickle
 import timeit
 import sys
-import argparse
-import isaacgym
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb
+from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
-from model import StressNet
+from model import StressNet2
 
 
 
-
+mgn_dataset_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset"
+raw_data_path = os.path.join(mgn_dataset_main_path, "raw_pickle_data")
+filtered_data_path = os.path.join(mgn_dataset_main_path, "filtered_data")
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
-adjacent_tetrahedrals_save_path = "/home/baothach/shape_servo_data/stress_field_prediction/adjacent_tetrahedrals"
-
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/data"
-
+dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
 
 start_time = timeit.default_timer() 
 visualization = False
-query_type = "sampled"  # options: sampled, particle, partial
+query_type = "sampled"  # options: sampled, full
 num_pts = 1024
+num_query_pts = 30000
 # stress_visualization_min = 0.001   
 # stress_visualization_max = 5e3 
 # log_stress_visualization_min = np.log(stress_visualization_min)   
@@ -36,95 +34,165 @@ force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
     
 
 device = torch.device("cuda")
-model = StressNet(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/run1/epoch 0"))
+model = StressNet2(num_channels=5).to(device)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run6(log)/epoch 150"))
 model.eval()
 
 
-# for object_name in OBJECT_NAMES:
-for object_name in ["strawberry"]:
+fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
+selected_primitive_names = ["6polygon", "8polygon", "cuboid", "cylinder", "sphere", "ellipsoid"]
+selected_primitive_names = ["ellipsoid"]
 
-    get_gripper_pc = True
+excluded_objects = \
+[f"6polygon0{i}" for i in [1,3]] + [f"8polygon0{i}" for i in [1,3]] + \
+[f"cylinder0{i}" for i in [1,2,3]] + [f"sphere0{i}" for i in [1,3]]
+# print("excluded_objects:", excluded_objects)
 
-    # Get adjacent tetrahdras of each vertex
-    with open(os.path.join(adjacent_tetrahedrals_save_path, f"{object_name}.pickle"), 'rb') as handle:
-        adjacent_tetrahedral_dict = pickle.load(handle)   
+# for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
+# for idx, object_name in enumerate(["sphere04"]):
+# for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
+for idx, file_name in enumerate(["ellipsoid01-p1"]):
+    object_name = os.path.splitext(file_name)[0]
 
-    with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
-        static_data = pickle.load(handle)
-    partial_pcs = static_data["partial_pcs"][1:2]  # list of 8 point clouds from 8 different camera views
-    partial_pcs = [down_sampling(pc, num_pts=num_pts) for pc in partial_pcs]
+    print("======================")
+    print_color(f"{object_name}, {idx}")
+    print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins")
 
+    if not any([prim_name in object_name for prim_name in selected_primitive_names]):   # if object does NOT belong to any of the selected primitives.
+        print_color(f"{object_name} is not processed (type 1)")
+        continue
+    if any([excluded_object in object_name for excluded_object in excluded_objects]):   # if object belongs to the excluded object list.
+        print_color(f"{object_name} is not processed (type 2)")
+        continue 
 
-    for i in range(*grasp_idx_bounds):        
+    for k in range(0,100):    # 100 grasp poses
         
-        
-        for force in force_levels:
-
-            print(f"{object_name} - grasp {i} - force {force}.")
-
-            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{i}_force_{force}.pickle")
-            if not os.path.isfile(file_name):
-                print(f"{file_name} not found")
-                break 
+        file_name = os.path.join(filtered_data_path, f"{object_name}_grasp_{k}.pickle")        
+        if not os.path.isfile(file_name):
             
-            with open(file_name, 'rb') as handle:
-                data = pickle.load(handle)
-
-            (tet_indices, tet_stress) = data["tet"]
-            tet_indices = np.array(tet_indices).reshape(-1,4)
-            (tri_indices, tri_parents, tri_normals) = data["tri"]
-                 
-            young_modulus = int(float(data["young_modulus"]))
-            full_pc = data["object_particle_state"]
-            force = data["force"]
-            grasp_pose = data["grasp_pose"]
-            fingers_joint_angles = data["fingers_joint_angles"]
-
-            all_stresses = compute_all_stresses(tet_stress, adjacent_tetrahedral_dict, full_pc.shape[0])
-            all_stresses_log = np.log(all_stresses)    
-            print("min(all_stresses):", min(all_stresses), max(all_stresses)) 
-            stress_visualization_min = min(all_stresses)   
-            stress_visualization_max = max(all_stresses)
-            log_stress_visualization_min = np.log(stress_visualization_min)   
-            log_stress_visualization_max = np.log(stress_visualization_max)   
-
-            if get_gripper_pc:
-                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
-                augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), (gripper_pc.shape[0], 1))))
-                pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
-                get_gripper_pc = False
-
-                augmented_partial_pcs = [np.hstack((pc, np.tile(np.array([force, young_modulus]), (pc.shape[0], 1))))
-                                        for pc in partial_pcs]  # list of 8 arrays of shape (num_pts,5)
-
-                # Combine everything together to get an augmented point cloud of shape (num_pts*2,5)
-                combined_pcs = [np.concatenate((pc, augmented_gripper_pc), axis=0)
-                                for pc in augmented_partial_pcs]  # list of 8 arrays of shape (num_pts + num_pts, 5)
-
-            batch_size = 100
-            occupancy_threshold = 0.1   #0.99
-            num_query_pts = 2   #1000
-            translation = 0.05
-            pcds = []
-            for j, query_type in enumerate(["sampled", "full"]):
-                pcd = reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_threshold, full_pc, 
-                                            combined_pcs[0], query_type, num_query_pts, 
-                                            [log_stress_visualization_min, log_stress_visualization_max], return_open3d_object=True)
-                pcd.translate((translation*(j+1),0,0))
-                pcds.append(pcd)
+            print_color(f"{file_name} not found")
+            continue
+        with open(file_name, 'rb') as handle:
+            data = pickle.load(handle)
+  
+        ### Get data for all 50 time steps
+        full_pcs = data["object_particle_states"] 
+        gt_stresses = np.log(data["stresses"])
+        forces = data["forces"]          
+        tet_indices = data["tet_indices"]
+        young_modulus = data["young_modulus"]
+        
+        
+        ### Load robot gripper point cloud
+        gripper_pc = data["gripper_pc"]     
+        augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), 
+                                        (gripper_pc.shape[0], 1)))) # shape (num_pts,5)
+        augmented_gripper_pc = np.tile(augmented_gripper_pc[np.newaxis, :, :], (8, 1, 1)) # shape (8,num_pts,5)
+        pcd_gripper = pcd_ize(gripper_pc, color=(0,0,0))
 
 
-            pcd_gt = pcd_ize(full_pc)
-            # colors = np.array(scalar_to_rgb(all_stresses_log, colormap='jet'))[:,:3]
-            colors = np.array(scalar_to_rgb(all_stresses_log, colormap='jet', 
-                                            min_val=log_stress_visualization_min, max_val=log_stress_visualization_max))[:,:3]
-            pcd_gt.colors = open3d.utility.Vector3dVector(colors)      
 
-            open3d.visualization.draw_geometries(pcds + [pcd_gt, pcd_gripper])
+        ### Load partial-view object point clouds
+        real_object_name = object_name
+        if "-p1" in object_name or "-p2" in object_name:
+            real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.
+        partial_pcs = read_pickle_data(data_path=os.path.join(static_data_recording_path, 
+                                        f"{real_object_name}.pickle"))["partial_pcs"]   # shape (8, num_pts, 3)
 
 
-    
+        for i in range(49,50):     # 50 time steps. Takes ~0.40 mins to process
+
+            query_data = read_pickle_data(data_path=os.path.join(dataset_path, f"processed sample {i}.pickle"))  # shape (B, 3)
+            # object_name = query_data["object_name"]
+            # grasp_idx = query_data["grasp_idx"]
+            # force = query_data["force"]
+            # young_modulus = query_data["young_modulus"]   
+            test_stress = query_data["stress_log"]
+            test_query = query_data["query_points"]
+            num = test_stress.shape[0]
+            # # test_stress = test_stress[:round(num/2)]
+            # # test_query = test_query[:round(num/2)]
+            test_occ = query_data["occupancy"]
+            # # print("test_stress:", query_data["stress_log"])
+            # # print("test_occ:", test_occ)
+            # occ_indices = np.where(query_data["stress_log"] > 0)[0]
+            # start_index = np.min(occ_indices)
+            # end_index = np.max(occ_indices)
+            # print("Range of indices:", start_index, "-", end_index)
+
+
+            # pcd_test = pcd_ize(test_query[occ_indices], color=[0,0,0], vis=True)
+
+            
+
+
+            force = forces[i]  
+            full_pc = full_pcs[i]
+
+            augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
+                                                    (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
+        
+            ### Combine object pc and gripper pc
+            combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1)[0:1,:,:] # shape (8, num_pts*2, 5)
+            combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
+            
+            
+            ### Get query points (sample randomly or use the ground-truth particles)
+            if query_type == "sampled":
+                # query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3) 
+                # query = full_pc
+                query = test_query
+                # # num_query_pts = query.shape[0]
+            
+            query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
+            query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
+            stress, occupancy = model(combined_pc_tensor, query_tensor) # shape (8*num_queries,1)
+
+            predicted_classes = (occupancy >= 0.7).int().squeeze().cpu().detach().numpy()
+            print("Accuracy:", np.sum(predicted_classes == test_occ)/test_occ.shape[0])
+
+
+            
+            # stress = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
+            # occupancy = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
+            pred_stress = stress.squeeze().cpu().detach().numpy()  # shape (num_queries, 1)
+            pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
+            occupied_idxs = np.where(pred_occupancy >= 0.5)[0]
+            # print("occupied_idxs.shape, pred_occupancy.shape[0]:", occupied_idxs.shape, pred_occupancy.shape[0])
+            print(query.shape, pred_occupancy.shape, pred_stress.shape)
+            
+            # print(pred_stress.shape, pred_occupancy.shape, query.shape)
+            # print(pred_stress[:10], gt_stresses[i][:10])
+            
+            # pcd = pcd_ize(query)
+            # colors = np.array(scalar_to_rgb(pred_stress, colormap='jet'))[:,:3]
+            # pcd.colors = open3d.utility.Vector3dVector(colors)
+
+            # pcd_gt = pcd_ize(full_pc, color=[0,0,0])
+            # colors = np.array(scalar_to_rgb(gt_stresses[i], colormap='jet'))[:,:3]
+            # pcd_gt.colors = open3d.utility.Vector3dVector(colors)
+
+            # pcd = pcd_ize(query[occupied_idxs])
+            # colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=min(gt_stresses[i]), max_val=max(gt_stresses[i])))[:,:3]
+            # pcd.colors = open3d.utility.Vector3dVector(colors)
+
+            # # print(min(gt_stresses[i]), max(gt_stresses[i]))
+
+            # # # pcd_test = pcd_ize(test_query, color=[0,0,0])
+            # # # colors = np.array(scalar_to_rgb(test_stress, colormap='jet'))[:,:3]
+            # # # pcd_test.colors = open3d.utility.Vector3dVector(colors)
+            
+            # # pcd_parial = pcd_ize(partial_pcs[0], color=[0,1,0])
+            
+            # # # open3d.visualization.draw_geometries([pcd_gt, pcd_gripper, pcd_test.translate((0.07,0,0))])
+            # # open3d.visualization.draw_geometries([pcd_parial, pcd_gt, pcd_gripper])
+
+            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
+            # # # # # open3d.visualization.draw_geometries([pcd_gt, pcd_gripper])
+            
+            
+            break
+        # break
 
 
 

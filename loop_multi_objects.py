@@ -22,8 +22,8 @@ dgn_dataset_path = "/home/baothach/stress_field_prediction/sim_data/stress_predi
 num_objects = len(os.listdir(dgn_dataset_path))
 selected_primitive_names = ["6polygon", "8polygon", "cuboid", "cylinder", "sphere", "ellipsoid"]
 
-# for i, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))):
-for i, object_name in enumerate([f"cuboid0{j}" for j in [6]]):
+for i, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))):
+# for i, object_name in enumerate([f"cuboid0{j}" for j in [6]]):
     # if "annulus" in object_name[:7]:
     #     continue
     if not any([prim_name in object_name for prim_name in selected_primitive_names]):   # if object does NOT belong to any of the selected primitives.

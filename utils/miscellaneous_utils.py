@@ -1,13 +1,10 @@
 import open3d
 import numpy as np
 from copy import deepcopy
-# from utils.farthest_point_sampling import *
-import trimesh
-import transformations
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
 import pickle
-
+import os
 
 
 def down_sampling(pc, num_pts=1024, return_indices=False):
@@ -118,8 +115,6 @@ def scalar_to_rgb(scalar_list, colormap='jet', min_val=None, max_val=None):
     return rgb
 
 
-
-
 def print_color(text, color="red"):
 
     RESET = "\033[0m"
@@ -138,3 +133,13 @@ def print_color(text, color="red"):
         print(BLUE + text + RESET)
     else:
         print(text)
+
+
+def read_pickle_data(data_path):
+    with open(data_path, 'rb') as handle:
+        return pickle.load(handle)      
+
+
+def write_pickle_data(data, data_path):
+    with open(data_path, 'wb') as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)    

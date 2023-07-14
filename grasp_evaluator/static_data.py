@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
-from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color
+from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, down_sampling
 from utils.camera_utils import *
 from isaacgym import gymtorch
 import pickle
@@ -190,8 +190,8 @@ class StaticDataCollection:
         # Create Sim object
         gpu_physics = 0
         gpu_render = 0
-        if not self.cfg['use_viewer']:
-            gpu_render = -1
+        # if not self.cfg['use_viewer']:
+        #     gpu_render = -1
         return self.gym.create_sim(gpu_physics, gpu_render, sim_type,
                                    sim_params), sim_params
 
@@ -365,7 +365,8 @@ class StaticDataCollection:
 
             object_height_buffer = 0.001
 
-            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up
+            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up
+            # print_color(f"{pose.p}")
 
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,
                                                   f"object_{i}", collision_group,
@@ -374,8 +375,10 @@ class StaticDataCollection:
 
             # Create platform
             height_of_platform = 0.005
+            # pose.p.z -= (height_of_platform + object_height_buffer +
+            #              + 0.5 * height_of_object)  # fix z_up
             pose.p.z -= (height_of_platform + object_height_buffer +
-                         + 0.5 * height_of_object)  # fix z_up
+                         + 0.5 * height_of_object) + (self.cfg['sim_params']['platform_height'] + object_height_buffer) # fix z_up
 
             if self.mode == "squeeze_no_gravity":
                 pose.p.y = 0.5
@@ -402,11 +405,11 @@ class StaticDataCollection:
             frame_count += 1
             if frame_count == 2:
                 # output_file = "/home/baothach/Downloads/test_cam_views.png"
-                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}_views.png"
+                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}.png"
 
                 
-                visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+                # visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+                #                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
                 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
                 os.makedirs(static_data_recording_path, exist_ok=True)
@@ -416,16 +419,21 @@ class StaticDataCollection:
                     partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
                                                                 segmentationId_dict, object_name="deformable", color=None, min_z=-50.005, 
                                                                 visualization=False, device="cpu")                   
-                    partial_pcs.append(deepcopy(partial_pc))
+                    partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])
+
+                partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)
+                partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
+                partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
                 data = {"partial_pcs": partial_pcs}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-                # # pcds = []
-                # # for pc in partial_pcs:
-                # #     pcds.append(pcd_ize(pc))
-                # # open3d.visualization.draw_geometries(pcds) 
+                   
+                # pcds = []
+                # for pc in partial_pcs:
+                #     pcds.append(pcd_ize(pc))
+                # open3d.visualization.draw_geometries(pcds) 
 
 
                 all_done = True

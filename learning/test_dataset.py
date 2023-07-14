@@ -25,19 +25,22 @@ visualization = True
 fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
 
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
-for idx, object_name in enumerate([f"ellipsoid0{j}" for j in [1,2,3,4]]):
+# for idx, object_name in enumerate([f"cylinder0{j}" for j in [1,2,3,4,5,6,7,8]]):
 # for idx, file_name in enumerate(sorted(os.listdir(raw_data_path))):
+for idx, object_name in enumerate(["ellipsoid01-p1"]):
 
-
-    for k in range(100):    # 100 grasp poses
+    for k in range(0,100):    # 100 grasp poses
         
         print("======================")
-        print(object_name, idx)
+        print(object_name, k, idx)
         
         # if not any([fruit_name in object_name for fruit_name in ["potato","eggplant","cucumber"]]):
         #     break
-        
-        mesh = trimesh.load(os.path.join(dgn_dataset_path, object_name, f"{object_name}.stl"))
+
+        real_object_name = object_name
+        if "-p1" in object_name or "-p2" in object_name:
+            real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.        
+        mesh = trimesh.load(os.path.join(dgn_dataset_path, real_object_name, f"{real_object_name}.stl"))
 
 
         
@@ -68,14 +71,16 @@ for idx, object_name in enumerate([f"ellipsoid0{j}" for j in [1,2,3,4]]):
         if any([fruit_name in object_name for fruit_name in fruit_names]):
             print_color(object_name)
             sampled_pc[:,2] *= -1
+        
+        gripper_pc = all_object_gripper_combined_particle_states[0][:first_object_index]
                 
-        for i in range(1):     # 50 time steps
+        for i in range(0,50):     # 50 time steps
             object_gripper_combined_particle_state = all_object_gripper_combined_particle_states[i]
             stress = all_stresses[i]
             force = all_forces[i]
             
             object_full_pc = object_gripper_combined_particle_state[first_object_index:]
-            gripper_pc = object_gripper_combined_particle_state[:first_object_index]
+            # gripper_pc = object_gripper_combined_particle_state[:first_object_index]
 
             
             pcd_full = pcd_ize(object_full_pc, color=[0,0,0])
@@ -84,6 +89,7 @@ for idx, object_name in enumerate([f"ellipsoid0{j}" for j in [1,2,3,4]]):
             coor = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1)
             # open3d.visualization.draw_geometries([pcd_full, pcd_test, coor.translate((0,1,0))])
             open3d.visualization.draw_geometries([pcd_full, pcd_test, pcd_gripper])
+            # open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
             
 
         

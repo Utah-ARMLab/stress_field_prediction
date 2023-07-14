@@ -147,6 +147,79 @@ def sample_and_compute_signed_distance(tri_indices, full_pc, boundary_threshold,
     return queries, outside_mesh_idxs
 
 
+# def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_threshold, full_pc, 
+#                              combined_pc, query_type, num_query_pts=None, 
+#                              stress_visualization_bounds=None, return_open3d_object=False):
+#     if query_type == "sampled": # sampled from bounding box
+#         sampled_points, outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
+#                                         boundary_threshold=[0.02,-0.01], \
+#                                         num_pts=num_query_pts, scales=[1.5, 1.5, 1.5], vis=False, seed=None, verbose=False)  
+#         predicted_stresses_log, predicted_occupancies, occupied_idxs = \
+#                                 get_stress_occupancy_query_points(model, device, query_list=sampled_points, 
+#                                                                   combined_pc=combined_pc,
+#                                                                   batch_size=batch_size, occupancy_threshold=occupancy_threshold)
+#         print("occupied_idxs.shape:", occupied_idxs.shape)
+#         selected_points = sampled_points[occupied_idxs] # select points that belong to the volume of the object (occupied)
+#         selected_stresses_log = predicted_stresses_log[occupied_idxs]
+
+#     elif query_type == "full":   # use object particles ("full_pc")
+#         predicted_stresses_log, predicted_occupancies, occupied_idxs = \
+#                                 get_stress_occupancy_query_points(model, device, query_list=full_pc, 
+#                                                                   combined_pc=combined_pc,
+#                                                                   batch_size=batch_size, occupancy_threshold=occupancy_threshold)
+#         selected_points = full_pc
+#         selected_stresses_log = predicted_stresses_log
+
+#     if not return_open3d_object:
+#         return selected_points
+#     else:
+#         pcd_stress_field = pcd_ize(selected_points)
+#         if stress_visualization_bounds is None:
+#             stress_field_colors = np.array(scalar_to_rgb(selected_stresses_log, colormap='jet'))[:,:3]
+#         else:
+#             stress_field_colors = np.array(scalar_to_rgb(
+#                 selected_stresses_log, colormap='jet', 
+#                 min_val=stress_visualization_bounds[0], max_val=stress_visualization_bounds[1]))[:,:3]
+            
+#         pcd_stress_field.colors = open3d.utility.Vector3dVector(stress_field_colors)        
+
+#         return pcd_stress_field
+
+def Tetrahedron_vectorized(vertices):
+    """
+    Given a list of the xyz coordinates of the vertices of a tetrahedron, 
+    return tetrahedron coordinate system
+    """
+    origin = vertices[:,:1,:]
+    rest = vertices[:,1:,:]
+    mat = (np.array(rest) - origin)
+    tetra = np.linalg.inv(mat)
+    return tetra.transpose((0,2,1)), origin
+
+def pointInside_vectorized(point, tetra, origin):
+    """
+    Takes a single point or array of points, as well as tetra and origin objects returned by 
+    the Tetrahedron function.
+    Returns a boolean or boolean array indicating whether the point is inside the tetrahedron.
+    """
+    newp = np.matmul(tetra, (point-origin).transpose((0,2,1))).transpose((0,2,1))
+    return np.all(newp>=0, axis=-1) & np.all(newp <=1, axis=-1) & (np.sum(newp, axis=-1) <=1)
+
+
+def is_inside_tet_mesh_vectorized(points, vertices, tet_indices):
+    """ 
+    Whether a set of points belong to the tetrahedral mesh volume.
+    Original implementation: https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/60745339#60745339      
+    """
+    v = vertices[tet_indices]
+    tetra, origin = Tetrahedron_vectorized(v)            
+    insides = pointInside_vectorized(points, tetra, origin).squeeze()   # shape (num_tetra, points.shape[0])
+
+    insides = np.any(insides, axis=0)   # shape (points.shape[0],)
+    
+    return insides
+
+
 def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_threshold, full_pc, 
                              combined_pc, query_type, num_query_pts=None, 
                              stress_visualization_bounds=None, return_open3d_object=False):
@@ -184,76 +257,3 @@ def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_t
         pcd_stress_field.colors = open3d.utility.Vector3dVector(stress_field_colors)        
 
         return pcd_stress_field
-
-def Tetrahedron(vertices):
-    """
-    Given a list of the xyz coordinates of the vertices of a tetrahedron, 
-    return tetrahedron coordinate system
-    """
-    origin, *rest = vertices
-    mat = (np.array(rest) - origin).T
-    tetra = np.linalg.inv(mat)
-    # print("tetra, origin", tetra, origin)
-    return tetra, origin
-
-def pointInside(point, tetra, origin):
-    """
-    Takes a single point or array of points, as well as tetra and origin objects returned by 
-    the Tetrahedron function.
-    Returns a boolean or boolean array indicating whether the point is inside the tetrahedron.
-    """
-    # print("mat.shape", tetra.shape, (point-origin).shape)
-    newp = np.matmul(tetra, (point-origin).T).T
-    # print("newp:", newp.shape)
-    # print("newp", newp)
-    # print("newp>=0", newp>=0)
-    return np.all(newp>=0, axis=-1) & np.all(newp <=1, axis=-1) & (np.sum(newp, axis=-1) <=1)
-
-def Tetrahedron_vectorized(vertices):
-    """
-    Given a list of the xyz coordinates of the vertices of a tetrahedron, 
-    return tetrahedron coordinate system
-    """
-    origin = vertices[:,:1,:]
-    rest = vertices[:,1:,:]
-    mat = (np.array(rest) - origin)
-    tetra = np.linalg.inv(mat)
-    # print("tetra, origin", tetra.transpose((0,2,1)), origin.transpose((0,2,1)))
-    return tetra.transpose((0,2,1)), origin
-
-def pointInside_vectorized(point, tetra, origin):
-    """
-    Takes a single point or array of points, as well as tetra and origin objects returned by 
-    the Tetrahedron function.
-    Returns a boolean or boolean array indicating whether the point is inside the tetrahedron.
-    """
-    # print("mat.shape", tetra.shape, (point-origin).shape)
-    newp = np.matmul(tetra, (point-origin).transpose((0,2,1))).transpose((0,2,1))
-    # print("newp:", newp.shape)
-    # print("newp", newp)
-    # print("newp>=0", newp>=0)
-    return np.all(newp>=0, axis=-1) & np.all(newp <=1, axis=-1) & (np.sum(newp, axis=-1) <=1)
-
-def is_point_inside_mesh(points, vertices, tetrahedra):
-    insides = [False for _ in range(points.shape[0])]
-    for tetra in tetrahedra:
-        v = [vertices[tetra[0]], vertices[tetra[1]], vertices[tetra[2]], vertices[tetra[3]]]
-        print("np.array(v).shape:", np.array(v).shape)
-        tetra, origin = Tetrahedron(v)
-        inside_tetra = pointInside(points, tetra, origin)
-        insides = np.logical_or(insides, inside_tetra)
-        
-    return insides
-
-def is_inside_tet_mesh_vectorized(points, vertices, tet_indices):
-    """ 
-    Whether a set of points belong to the tetrahedral mesh volume.
-    Original implementation: https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/60745339#60745339      
-    """
-    v = vertices[tet_indices]
-    tetra, origin = Tetrahedron_vectorized(v)            
-    insides = pointInside_vectorized(points, tetra, origin).squeeze()   # shape (num_tetra, points.shape[0])
-
-    insides = np.any(insides, axis=0)   # shape (points.shape[0],)
-    
-    return insides

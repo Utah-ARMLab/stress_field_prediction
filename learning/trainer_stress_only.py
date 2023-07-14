@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-from model import StressNet2
+from model import StressNetStressOnly
 from dataset_loader import StressPredictionDataset3
 import os
 import torch.nn.functional as F
@@ -49,33 +49,22 @@ def train(model, device, train_loader, optimizer, epoch):
 
         # print(target_stress.shape, target_occupancy.shape)
         # print(pc.shape, query.shape)
-
             
         optimizer.zero_grad()
         output = model(pc, query)
 
-        predicted_classes = (output[1] >= 0.5).squeeze().int()
-        batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
-        correct += batch_correct
-        total_num_qrs += target_stress.shape[0]
-
         # if occupancy = 1, combine both losses from stress and occupancy
         # if occupancy = 0, only use the loss from occupancy            
-        loss_occ = nn.BCELoss()(output[1], target_occupancy) #* 5e7   # occupancy loss
                 
         occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
-        # total_occupied_qrs += occupied_idxs.shape[0]
         if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
-            selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
-            loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs])  # stress loss
+            loss_stress = F.mse_loss(output[occupied_idxs], target_stress[occupied_idxs])  # stress loss
         else:
             loss_stress = 0
                     
-        # loss_stress /= 95
-        loss_occ *= 500
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
-        loss = loss_occ + loss_stress   
+        loss = loss_stress 
         
         
         loss.backward()
@@ -88,20 +77,17 @@ def train(model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(sample), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
             
-            print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
+            # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
             
         
-        if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
+        if batch_idx % 100 == 0 or batch_idx == len(train_loader.dataset) - 1:  
             train_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
-            train_accuracies.append(100.* batch_correct / pc.shape[0])
     
     print('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
-    print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
     logger.info('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
-    logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
 
 
@@ -112,10 +98,13 @@ def test(model, device, test_loader, epoch):
     correct = 0
     total_num_qrs = 0
     total_occupied_qrs = 0
+    num_batch = 0
 
     with torch.no_grad():
         for batch_idx, sample in enumerate(test_loader):
-           
+            
+            num_batch += 1
+            
             pc = sample["pc"].to(device)
             query = sample["query"].to(device)
             target_stress = sample["stress"].to(device)
@@ -123,8 +112,7 @@ def test(model, device, test_loader, epoch):
 
             target_stress = target_stress.reshape(-1,1) # shape (total_num_qrs,1)
             target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-            # num_queries = query.shape[1]
-            # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
+
 
             pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
             query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
@@ -133,28 +121,21 @@ def test(model, device, test_loader, epoch):
             output = model(pc, query)
                     
             occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
-            total_occupied_qrs += occupied_idxs.shape[0]
             if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
-                selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
-                loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs], reduction='sum')  # stress loss
+                loss_stress = F.mse_loss(output[occupied_idxs], target_stress[occupied_idxs], reduction="sum")  # stress loss
                 test_loss += loss_stress.item()
-           
-            
-            predicted_classes = (output[1] >= 0.5).squeeze().int()
-            batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
-            correct += batch_correct
-            total_num_qrs += target_stress.shape[0]
+
+            # print('Test Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            #     epoch, batch_idx * len(sample), len(test_loader.dataset),
+            #     100. * batch_idx / len(test_loader), loss_stress.item()))           
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
             test_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
-            test_accuracies.append(100.* batch_correct / pc.shape[0])      
                             
 
     test_loss /= len(test_loader.dataset)
     print('\n(Test set) Average stress loss: {:.3f}'.format(test_loss))
-    print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")  
-    logger.info('(Test set) Average stress loss: {:.3f}'.format(test_loss))
-    logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")   
+    logger.info('(Test set) Average stress loss: {:.3f}\n'.format(test_loss))
 
 
 def weights_init(m):
@@ -170,7 +151,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run6(log)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run4(stress_only)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -213,14 +194,14 @@ if __name__ == "__main__":
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    model = StressNet2(num_channels=5).to(device)
+    model = StressNetStressOnly(num_channels=5).to(device)
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 20, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 151):
+    for epoch in range(0, 61):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

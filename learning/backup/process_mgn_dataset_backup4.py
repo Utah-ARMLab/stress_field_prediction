@@ -20,14 +20,14 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 mgn_dataset_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset"
 raw_data_path = os.path.join(mgn_dataset_main_path, "raw_pickle_data")
 data_path = os.path.join(mgn_dataset_main_path, "filtered_data")
-data_processed_path = os.path.join(mgn_dataset_main_path, "shinghei_data")
+data_processed_path = os.path.join(mgn_dataset_main_path, "single_data")
 os.makedirs(data_processed_path, exist_ok=True)
 
 start_time = timeit.default_timer()
-visualization = False
+visualization = True
 verbose = False
 num_pts = 1024
-# num_query_pts = 10000
+# num_query_pts = 1000
 data_point_count = len(os.listdir(data_processed_path))
 
 fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
@@ -104,13 +104,13 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
                 
         #         break
         
-        num_query_pts = full_pcs[0].shape[0]
-        for i in range(0,50):     # 50 time steps. Takes ~0.40 mins to process
+        num_query_pts = 10000#full_pcs[0].shape[0]
+        for i in range(40,50):     # 50 time steps. Takes ~0.40 mins to process
             force = forces[i]  
             full_pc = full_pcs[i]
 
             # Points belongs the object volume            
-            selected_idxs = np.arange(full_pc.shape[0]) 
+            selected_idxs = np.random.randint(low=0, high=full_pc.shape[0], size=num_query_pts) # wrong
             query_points = full_pc[selected_idxs]
             stress = stresses[i][selected_idxs]
             occupancy = np.ones(stress.shape)
@@ -122,7 +122,6 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
                 sampled_points = sample_points_bounding_box(trimesh.PointCloud(full_pc), round(num_query_pts*1.3), scales=[1.5]*3) 
                 is_inside = is_inside_tet_mesh_vectorized(sampled_points, vertices=full_pc, tet_indices=tet_indices)
                 outside_mesh_idxs = np.where(is_inside == False)[0]
-                
                 # print(f"num_outside/total: {outside_mesh_idxs.shape[0]}/{num_query_pts}")
   
             if visualization:
@@ -138,17 +137,17 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
                 #     query_sphere.translate(tuple(query))    
                 #     pcds.append(query_sphere)
                 # open3d.visualization.draw_geometries(pcds + [pcd_full])  
-                pcd_outside = pcd_ize(sampled_points[outside_mesh_idxs], color=[1,0,0])   
-                inside_mesh_idxs = np.where(is_inside == True)[0]             
+                pcd_outside = pcd_ize(sampled_points[outside_mesh_idxs], color=[1,0,0])
+                inside_mesh_idxs = np.where(is_inside == True)[0]
                 pcd_inside = pcd_ize(sampled_points[inside_mesh_idxs], color=[0,1,0])
                 open3d.visualization.draw_geometries([pcd_outside.translate((0.09,0,0)), pcd_inside.translate((-0.09,0,0)), pcd_full])
                  
             
             outside_mesh_idxs = outside_mesh_idxs[:num_query_pts] # only select num_query_pts queries
-            query_points_outside = sampled_points[outside_mesh_idxs]
-            stress_outside = 0.0001 * np.ones(outside_mesh_idxs.shape[0])     #-4 * np.ones(outside_mesh_idxs.shape[0])
+            query_points_outside = sampled_points[:num_query_pts]
+            stress_outside = -4 * np.ones(outside_mesh_idxs.shape[0])
             occupancy_outside = np.zeros(stress_outside.shape)
-
+            
 
             all_query_points = np.concatenate((query_points, query_points_outside), axis=0)
             all_stresses = np.concatenate((stress, stress_outside), axis=0)
@@ -156,20 +155,20 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             # print(all_query_points.shape, all_stresses.shape, all_occupancies.shape)
             
 
-            processed_data = {"stress_log": all_stresses, "occupancy": all_occupancies,                                    
-                            "query_points": all_query_points, "force": force, "young_modulus": young_modulus,
-                            "object_name": object_name, "grasp_idx": k}            
+            # processed_data = {"stress_log": all_stresses, "occupancy": all_occupancies,                                    
+            #                 "query_points": all_query_points, "force": force, "young_modulus": young_modulus,
+            #                 "object_name": object_name, "grasp_idx": k}            
 
-            with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-                pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            # with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+            #     pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
                 
-            data_point_count += 1   
+            # data_point_count += 1   
                             
             # break   
         
         
         
-        # break     
+        break     
     
     
     

@@ -1,6 +1,6 @@
 import torch
 import torch.optim as optim
-from model import StressNet2
+from model import StressNetOccupancyOnly
 from dataset_loader import StressPredictionDataset3
 import os
 import torch.nn.functional as F
@@ -36,13 +36,10 @@ def train(model, device, train_loader, optimizer, epoch):
             
         pc = sample["pc"].to(device)
         query = sample["query"].to(device)
-        target_stress = sample["stress"].to(device)
         target_occupancy = sample["occupancy"].to(device)
                
-        target_stress = target_stress.reshape(-1,1) # shape (total_num_qrs,1)
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-        # num_queries = query.shape[1]
-        # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
+
 
         pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
@@ -54,32 +51,18 @@ def train(model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
         output = model(pc, query)
 
-        predicted_classes = (output[1] >= 0.5).squeeze().int()
+        predicted_classes = (output >= 0.5).squeeze().int()
         batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
         correct += batch_correct
-        total_num_qrs += target_stress.shape[0]
 
         # if occupancy = 1, combine both losses from stress and occupancy
         # if occupancy = 0, only use the loss from occupancy            
-        loss_occ = nn.BCELoss()(output[1], target_occupancy) #* 5e7   # occupancy loss
-                
-        occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
-        # total_occupied_qrs += occupied_idxs.shape[0]
-        if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
-            selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
-            loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs])  # stress loss
-        else:
-            loss_stress = 0
-                    
-        # loss_stress /= 95
-        loss_occ *= 500
+        loss_occ = nn.BCELoss()(output, target_occupancy) #* 5e7   # occupancy loss
         
-        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
-        loss = loss_occ + loss_stress   
-        
+        loss = loss_occ  
+        train_loss += loss_occ.item()   #loss.item()
         
         loss.backward()
-        train_loss += loss_stress.item()   #loss.item()
         optimizer.step()
 
         if batch_idx % 100 == 0:
@@ -88,12 +71,11 @@ def train(model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(sample), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
             
-            print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
-            
-        
+       
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
-            train_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
+            train_stress_losses.append(loss_occ.item())
             train_accuracies.append(100.* batch_correct / pc.shape[0])
+    
     
     print('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
@@ -118,13 +100,10 @@ def test(model, device, test_loader, epoch):
            
             pc = sample["pc"].to(device)
             query = sample["query"].to(device)
-            target_stress = sample["stress"].to(device)
             target_occupancy = sample["occupancy"].to(device)
 
-            target_stress = target_stress.reshape(-1,1) # shape (total_num_qrs,1)
             target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-            # num_queries = query.shape[1]
-            # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
+
 
             pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
             query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
@@ -132,21 +111,18 @@ def test(model, device, test_loader, epoch):
             
             output = model(pc, query)
                     
-            occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
-            total_occupied_qrs += occupied_idxs.shape[0]
-            if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
-                selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
-                loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs], reduction='sum')  # stress loss
-                test_loss += loss_stress.item()
+                    
+            loss_occ = nn.BCELoss()(output, target_occupancy)        
+            test_loss += loss_occ.item()
            
             
-            predicted_classes = (output[1] >= 0.5).squeeze().int()
+            predicted_classes = (output >= 0.5).squeeze().int()
             batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
             correct += batch_correct
-            total_num_qrs += target_stress.shape[0]
+            
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
-            test_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
+            test_stress_losses.append(loss_occ.item())
             test_accuracies.append(100.* batch_correct / pc.shape[0])      
                             
 
@@ -170,7 +146,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run6(log)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run7(occupancy_only)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -213,7 +189,7 @@ if __name__ == "__main__":
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    model = StressNet2(num_channels=5).to(device)
+    model = StressNetOccupancyOnly(num_channels=5).to(device)
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -231,12 +207,12 @@ if __name__ == "__main__":
         scheduler.step()
         test(model, device, test_loader, epoch)
         
-        if epoch % 1 == 0:            
-            torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
+        # if epoch % 1 == 0:            
+        #     torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
             
-        saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
-                "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
-        with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
-            pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+        # saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
+        #         "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
+        # with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
+        #     pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
             
         
