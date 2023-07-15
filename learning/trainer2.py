@@ -72,7 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
         # loss_stress /= 95
-        loss_occ *= 500
+        loss_occ *= 95
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run6(log)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run1"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)

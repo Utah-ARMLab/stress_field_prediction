@@ -54,6 +54,7 @@ def train(model, device, train_loader, optimizer, epoch):
         predicted_classes = (output >= 0.5).squeeze().int()
         batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
         correct += batch_correct
+        total_num_qrs += target_occupancy.shape[0]
 
         # if occupancy = 1, combine both losses from stress and occupancy
         # if occupancy = 0, only use the loss from occupancy            
@@ -119,7 +120,7 @@ def test(model, device, test_loader, epoch):
             predicted_classes = (output >= 0.5).squeeze().int()
             batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
             correct += batch_correct
-            
+            total_num_qrs += target_occupancy.shape[0]
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
             test_stress_losses.append(loss_occ.item())
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run7(occupancy_only)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(occupancy_only)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -159,10 +160,10 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_2"
     dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
-    batch_size = 20     
+    batch_size = 8     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)-1
@@ -207,12 +208,12 @@ if __name__ == "__main__":
         scheduler.step()
         test(model, device, test_loader, epoch)
         
-        # if epoch % 1 == 0:            
-        #     torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
+        if epoch % 1 == 0:            
+            torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
             
-        # saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
-        #         "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
-        # with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
-        #     pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+        saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
+                "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
+        with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
+            pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
             
         

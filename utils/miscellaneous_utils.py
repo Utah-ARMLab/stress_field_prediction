@@ -14,10 +14,11 @@ def down_sampling(pc, num_pts=1024, return_indices=False):
 
     """
     Input:
-        pc: pointcloud data, [B, N, D] where B= num batches, N=num points, D=feature size (typically D=3)
+        pc: point cloud data, [B, N, D] where B = num batches, N = num points, D = feature size (typically D=3)
         num_pts: number of samples
     Return:
         centroids: sampled pointcloud index, [num_pts, D]
+        pc: down_sampled point cloud, [num_pts, D]
     """
 
     if pc.ndim == 2:

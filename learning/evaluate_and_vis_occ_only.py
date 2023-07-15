@@ -9,7 +9,7 @@ from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
-from model import StressNet2
+from model import StressNetOccupancyOnly
 
 
 
@@ -34,8 +34,8 @@ force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
     
 
 device = torch.device("cuda")
-model = StressNet2(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run1/epoch 107"))
+model = StressNetOccupancyOnly(num_channels=5).to(device)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(occupancy_only)/epoch 24"))
 model.eval()
 
 
@@ -98,6 +98,10 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.
         partial_pcs = read_pickle_data(data_path=os.path.join(static_data_recording_path, 
                                         f"{real_object_name}.pickle"))["partial_pcs"]   # shape (8, num_pts, 3)
+        pcds = []
+        for j, pc in enumerate(partial_pcs):
+            pcds.append(pcd_ize(pc, color=[0,1,0]).translate((0,0.00*j,0)))
+        open3d.visualization.draw_geometries(pcds)
 
 
         for i in range(49,50):     # 50 time steps. Takes ~0.40 mins to process
@@ -128,11 +132,11 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
                 # query = test_query
                 is_inside = is_inside_tet_mesh_vectorized(query, vertices=full_pc, tet_indices=tet_indices).astype(int)
 
-            
+            # pcd_test = pcd_ize(query[np.where(is_inside)[0]], color=[0,0,0], vis=True)
             
             query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
             query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
-            stress, occupancy = model(combined_pc_tensor, query_tensor) # shape (8*num_queries,1)
+            occupancy = model(combined_pc_tensor, query_tensor) # shape (8*num_queries,1)
 
             predicted_classes = (occupancy >= 0.5).int().squeeze().cpu().detach().numpy()
             print("Accuracy:", np.sum(predicted_classes == is_inside)/is_inside.shape[0])
@@ -140,30 +144,24 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             # stress = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             # occupancy = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
-            pred_stress = stress.squeeze().cpu().detach().numpy()  # shape (num_queries, 1)
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
             # occupied_idxs = np.where(pred_occupancy >= 0.8)[0]
             occupied_idxs = np.where(predicted_classes != is_inside)[0]
             # occupied_idxs_2 = np.where(predicted_classes == 1)[0]
             # occupied_idxs = np.intersect1d(occupied_idxs, occupied_idxs_2)
             
-            pcd_test = pcd_ize(query[predicted_classes != is_inside[0]], color=[0,0,0], vis=True)
-            
             print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)
             
             print(np.count_nonzero(is_inside[occupied_idxs] == 1), np.count_nonzero(is_inside[occupied_idxs] == 0), np.count_nonzero(predicted_classes[occupied_idxs] == 1))
             print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
-            # # assert np.count_nonzero(is_inside[occupied_idxs] == 1) == 0
+            # assert np.count_nonzero(is_inside[occupied_idxs] == 1) == 0
 
-            # pcd_gt = pcd_ize(full_pc, color=[0,0,0])
-            # colors = np.array(scalar_to_rgb(gt_stresses[i], colormap='jet'))[:,:3]
-            # pcd_gt.colors = open3d.utility.Vector3dVector(colors)
+            pcd_gt = pcd_ize(full_pc, color=[1,0,0])
 
-            # pcd = pcd_ize(query[occupied_idxs])
-            # colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=min(gt_stresses[i]), max_val=max(gt_stresses[i])))[:,:3]
-            # pcd.colors = open3d.utility.Vector3dVector(colors)
+            pcd = pcd_ize(query[occupied_idxs], color=[0,0,0])
 
-            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
+            # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
+            open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt] + pcds)
             
             
             print_color("========================")
@@ -173,7 +171,8 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             
             break
-        break
+        
+        # break
 
 
 

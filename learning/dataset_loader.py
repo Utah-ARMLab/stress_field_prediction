@@ -113,14 +113,23 @@ class StressPredictionDataset3(Dataset):
         query = query.unsqueeze(0).repeat(8,1,1)  # shape (B, 8, num_queries, 3)
         
         # stress = torch.FloatTensor([query_data["stress_log"]])  # shape (B, 1, num_queries) FIX        
-        # # stress = stress.repeat(8,1)  # shape (B, 8, num_queries)               
-        # positive_mask = stress > 0
-        # stress_log = torch.where(positive_mask, torch.log(stress), stress)  # Compute the logarithm of positive elements and keep negative elements unchanged
+        # # # stress = stress.repeat(8,1)  # shape (B, 8, num_queries)    
+        # # # stress_log = torch.log(stress)          
+        # positive_mask = stress > 0.0
+        # stress_log = torch.where(positive_mask, torch.log(stress), torch.log(torch.FloatTensor([0.1])))  # Compute the logarithm of positive elements and keep negative elements unchanged. When stress = 0, just curve it up to 0.1 so log(stress) is defined
         # stress_log = stress_log.repeat(8,1)  # shape (B, 8, num_queries)
+
 
         occupancy = torch.tensor(query_data["occupancy"]).unsqueeze(0).float()  # shape (B, 1) FIX
         occupancy = occupancy.repeat(8,1)  # shape (B, 8, 1)
         
+        # if torch.isinf(stress_log).any():
+        #     nan_indices = torch.isinf(stress_log)
+        #     # stress = stress.repeat(8,1)
+        #     print(torch.nonzero(torch.isinf(stress_log)).squeeze())
+        #     print(stress[nan_indices])
+        #     print(occupancy[nan_indices])
+        #     raise SystemExit("nan")
         
         # sample = {"pc": pc, "query":  query,  "stress": stress_log, "occupancy": occupancy}     
         sample = {"pc": pc, "query":  query, "occupancy": occupancy}    

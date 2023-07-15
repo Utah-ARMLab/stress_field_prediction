@@ -42,7 +42,7 @@ excluded_objects = \
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
 # for idx, object_name in enumerate(["sphere04"]):
 # for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["ellipsoid01-p1"]):
+for idx, file_name in enumerate(["ellipsoid01-p2"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -113,14 +113,10 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             selected_idxs = np.arange(full_pc.shape[0]) 
             query_points = full_pc[selected_idxs]
             stress = stresses[i][selected_idxs]
-            # occupancy = np.ones(stress.shape)
-            
-            num_duplicates = np.ceil(num_query_pts / full_pcs[0].shape[0])
-            query_points = np.repeat(query_points, num_duplicates, axis=0)[:num_query_pts]
-            stress = np.repeat(stress, num_duplicates, axis=0)[:num_query_pts]
             occupancy = np.ones(stress.shape)
-            # print(query_points.shape, stress.shape, occupancy.shape)
-            # pcd_ize(query_points, color=[0,0,0], vis=True)
+
+            print(min(stress))
+
                 
             # Random points (outside object mesh)  
             outside_mesh_idxs = None
@@ -129,7 +125,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
                 is_inside = is_inside_tet_mesh_vectorized(sampled_points, vertices=full_pc, tet_indices=tet_indices)
                 outside_mesh_idxs = np.where(is_inside == False)[0]
                 
-                # print(f"num_outside/total: {outside_mesh_idxs.shape[0]}/{num_query_pts}")
+                print(f"num_outside/total: {outside_mesh_idxs.shape[0]}/{num_query_pts}")
   
             if visualization:
                 pcds = []
@@ -175,7 +171,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
         
         
         
-        # break     
+        break     
     
     
     
