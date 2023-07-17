@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
-from model import StressNetOccupancyOnly
-from dataset_loader import StressPredictionDataset3
+from model_ori import StressNetSDF, StressNetOccupancyOnly
+from dataset_loader_ori import StressPredictionDataset
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -12,7 +12,7 @@ import socket
 import timeit
 import numpy as np
 import sys
-sys.path.append("../")
+sys.path.append("../../")
 from utils.miscellaneous_utils import print_color
 
 
@@ -36,32 +36,37 @@ def train(model, device, train_loader, optimizer, epoch):
             
         pc = sample["pc"].to(device)
         query = sample["query"].to(device)
-        target_occupancy = sample["occupancy"].to(device)
-               
-        target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
+        
+        if train_sdf:
+            target_signed_distance = sample["signed_distance"].to(device)              
+            target_signed_distance = target_signed_distance.reshape(-1,1) # shape (total_num_qrs,1)            
+        else:    
+            target_occupancy = sample["occupancy"].to(device)              
+            target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
 
 
         pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
 
-        # print(target_occupancy.shape)
+        # print(target_signed_distance.shape)
         # print(pc.shape, query.shape)
 
             
         optimizer.zero_grad()
         output = model(pc, query)
 
-        predicted_classes = (output >= 0.5).squeeze().int()
-        batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
-        correct += batch_correct
-        total_num_qrs += target_occupancy.shape[0]
+        if not train_sdf:
+            predicted_classes = (output >= 0.5).squeeze().int()
+            batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
+            correct += batch_correct
+            total_num_qrs += target_occupancy.shape[0]
 
-        # if occupancy = 1, combine both losses from stress and occupancy
-        # if occupancy = 0, only use the loss from occupancy            
-        loss_occ = nn.BCELoss()(output, target_occupancy) #* 5e7   # occupancy loss
-        
-        loss = loss_occ  
-        train_loss += loss_occ.item()   #loss.item()
+        if train_sdf:
+            loss = F.mse_loss(output, target_signed_distance)
+        else:
+            loss = nn.BCELoss()(output, target_occupancy)   # occupancy loss
+
+        train_loss += loss.item()   #loss.item()
         
         loss.backward()
         optimizer.step()
@@ -74,17 +79,20 @@ def train(model, device, train_loader, optimizer, epoch):
             
        
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
-            train_stress_losses.append(loss_occ.item())
-            train_accuracies.append(100.* batch_correct / target_occupancy.shape[0])
+            train_stress_losses.append(loss.item())
+            if not train_sdf:
+                train_accuracies.append(100.* batch_correct / target_occupancy.shape[0])
     
     
-    print('(Train set) Average stress loss: {:.3f}'.format(
+    print('(Train set) Average stress loss: {:.6f}'.format(
                 train_loss/num_batch))  
-    print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
+    if not train_sdf:
+        print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
-    logger.info('(Train set) Average stress loss: {:.3f}'.format(
+    logger.info('(Train set) Average stress loss: {:.6f}'.format(
                 train_loss/num_batch))  
-    logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
+    if not train_sdf:
+        logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
 
 
@@ -101,9 +109,13 @@ def test(model, device, test_loader, epoch):
            
             pc = sample["pc"].to(device)
             query = sample["query"].to(device)
-            target_occupancy = sample["occupancy"].to(device)
-
-            target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
+            
+            if train_sdf:
+                target_signed_distance = sample["signed_distance"].to(device)              
+                target_signed_distance = target_signed_distance.reshape(-1,1) # shape (total_num_qrs,1)            
+            else:    
+                target_occupancy = sample["occupancy"].to(device)              
+                target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
 
 
             pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
@@ -112,26 +124,32 @@ def test(model, device, test_loader, epoch):
             
             output = model(pc, query)
                     
-                    
-            loss_occ = nn.BCELoss()(output, target_occupancy)        
-            test_loss += loss_occ.item()
+            if train_sdf:
+                loss = F.mse_loss(output, target_signed_distance)
+            else:
+                loss = nn.BCELoss()(output, target_occupancy)   # occupancy loss    
+                 
+            test_loss += loss.item()
            
-            
-            predicted_classes = (output >= 0.5).squeeze().int()
-            batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
-            correct += batch_correct
-            total_num_qrs += target_occupancy.shape[0]
+            if not train_sdf:
+                predicted_classes = (output >= 0.5).squeeze().int()
+                batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
+                correct += batch_correct
+                total_num_qrs += target_occupancy.shape[0]
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
-            test_stress_losses.append(loss_occ.item())
-            test_accuracies.append(100.* batch_correct / target_occupancy.shape[0])      
+            test_stress_losses.append(loss.item())
+            if not train_sdf:
+                test_accuracies.append(100.* batch_correct / target_occupancy.shape[0])      
                             
 
     test_loss /= len(test_loader.dataset)
-    print('\n(Test set) Average stress loss: {:.3f}'.format(test_loss))
-    print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")  
-    logger.info('(Test set) Average stress loss: {:.3f}'.format(test_loss))
-    logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")   
+    print('\n(Test set) Average stress loss: {:.6f}'.format(test_loss))
+    if not train_sdf:
+        print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")  
+    logger.info('(Test set) Average stress loss: {:.6f}'.format(test_loss))
+    if not train_sdf:
+        logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")   
 
 
 def weights_init(m):
@@ -147,7 +165,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(conv1d)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/run1(occ)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -160,10 +178,10 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
-    dataset = StressPredictionDataset3(dataset_path)
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data"
+    dataset = StressPredictionDataset(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
-    batch_size = 400     
+    batch_size = 150     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)-1
@@ -189,15 +207,19 @@ if __name__ == "__main__":
     logger.info(f"Test len: {len(test_dataset)}") 
     logger.info(f"Data path: {dataset.dataset_path}") 
     
-
-    model = StressNetOccupancyOnly(num_channels=5).to(device)
+    train_sdf = False
+    if train_sdf:
+        model = StressNetSDF(num_channels=5).to(device)
+    else:
+        model = StressNetOccupancyOnly(num_channels=5).to(device)
+        
     model.apply(weights_init)
       
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 150, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 301):
+    for epoch in range(0, 151):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

@@ -22,7 +22,7 @@ gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_predic
 os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/data"
-data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data"
+data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_2"
 os.makedirs(data_processed_path, exist_ok=True)
 
 data_point_count = len(os.listdir(data_processed_path))
