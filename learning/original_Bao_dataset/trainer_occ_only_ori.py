@@ -165,7 +165,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/run1(occ)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/run2(occ)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_2"
     dataset = StressPredictionDataset(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 150     

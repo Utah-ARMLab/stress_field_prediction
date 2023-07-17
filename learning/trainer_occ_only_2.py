@@ -147,7 +147,8 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(conv1d)"
+    weight_path = \
+        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/run2(occ_only)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_sdf"
     dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 400     
@@ -193,11 +194,11 @@ if __name__ == "__main__":
     model = StressNetOccupancyOnly(num_channels=5).to(device)
     model.apply(weights_init)
       
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 150, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 301):
+    for epoch in range(0, 151):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

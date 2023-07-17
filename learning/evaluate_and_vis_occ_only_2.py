@@ -35,7 +35,7 @@ force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
 
 device = torch.device("cuda")
 model = StressNetOccupancyOnly(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run1(conv1d)/epoch 150"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/run1(occ_only)/epoch 150"))
 model.eval()
 
 
@@ -127,10 +127,10 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             ### Get query points (sample randomly or use the ground-truth particles)
             if query_type == "sampled":
-                # query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.2]*3)  # shape (num_query_pts,3) 
+                query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.2]*3)  # shape (num_query_pts,3) 
                 
                 # query = full_pc
-                query = test_query
+                # query = test_query
                 is_inside = is_inside_tet_mesh_vectorized(query, vertices=full_pc, tet_indices=tet_indices).astype(int)
 
             pcd_test = pcd_ize(test_query[np.where(test_occ==0)[0]], color=[0,0,0], vis=True)
@@ -147,28 +147,26 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             # stress = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             # occupancy = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.5)[0]
             # occupied_idxs = np.where(predicted_classes == is_inside)[0]
             # occupied_idxs_2 = np.where(predicted_classes == 1)[0]
             # occupied_idxs = np.intersect1d(occupied_idxs, occupied_idxs_2)
             
-            print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)       
-            print(np.count_nonzero(is_inside[occupied_idxs] == 1), np.count_nonzero(is_inside[occupied_idxs] == 0), np.count_nonzero(predicted_classes[occupied_idxs] == 1))
+            # print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)       
+            # print(np.count_nonzero(is_inside[occupied_idxs] == 1), np.count_nonzero(is_inside[occupied_idxs] == 0), np.count_nonzero(predicted_classes[occupied_idxs] == 1))
             
-            # print(np.sum(is_inside == test_occ), test_occ.shape[0])
-            # wrong_labels = np.where(is_inside != test_occ)[0]
-            # print(np.count_nonzero(is_inside[wrong_labels] == 1), np.count_nonzero(test_occ[wrong_labels] == 1))
-            # # print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
-            # pcd_wrong = pcd_ize(query[wrong_labels], color=[0,1,0])
+            # # print(np.sum(is_inside == test_occ), test_occ.shape[0])
+            # # wrong_labels = np.where(is_inside != test_occ)[0]
+            # # print(np.count_nonzero(is_inside[wrong_labels] == 1), np.count_nonzero(test_occ[wrong_labels] == 1))
+            # # # print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
+            # # pcd_wrong = pcd_ize(query[wrong_labels], color=[0,1,0])
 
-            # pcd_gt = pcd_ize(full_pc, color=[1,0,0])
+            pcd_gt = pcd_ize(full_pc, color=[1,0,0])
 
-            # pcd = pcd_ize(query[occupied_idxs], color=[0,0,0])
+            pcd = pcd_ize(query[occupied_idxs], color=[0,0,0])
             
-            # pcd_bad = pcd_ize(query[np.where(predicted_classes != is_inside)[0]], color=[0,0,0])
 
-            # # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
-            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_bad.translate((0.14,0,0))])
+            open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt])
             
             
             print_color("========================")

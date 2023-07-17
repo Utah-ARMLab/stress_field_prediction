@@ -134,8 +134,7 @@ class PointCloudEncoderConv1D(nn.Module):
         # do max pooling 
         x = torch.max(x, 2, keepdim=True)[0]
         x_pc = x.view(-1, self.embedding_size)
-        
-        # print("Baobaobaobaobao")
+
         
         return x_pc
 
@@ -192,10 +191,10 @@ class StressNet2(nn.Module):
     '''
     Stress Prediction
     '''
-    def __init__(self, num_channels):
+    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D):
         super(StressNet2, self).__init__()
         
-        self.pc_encoder = PointCloudEncoder(num_channels=num_channels)
+        self.pc_encoder = pc_encoder_type(num_channels=num_channels)
         self.qr_embedder = QueryEmbedder()
 
     def forward(self, pc, query):

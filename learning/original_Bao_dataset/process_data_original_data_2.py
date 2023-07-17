@@ -29,7 +29,7 @@ data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
 num_pts = 1024
-num_query_pts = 4000
+# num_query_pts = 4000
 
 grasp_idx_bounds = [0, 100]
 force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
@@ -96,33 +96,33 @@ for object_name in ["6polygon04"]:
 
             full_pc = object_particle_state
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
+            signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
             # print("full_pc.shape:", full_pc.shape)
 
-            ### Points belongs to the object surface     
-            query_points_surface = trimesh.sample.sample_surface_even(object_mesh, count=num_query_pts)[0]
-            while query_points_surface.shape[0] != num_query_pts:
-                query_points_surface = trimesh.sample.sample_surface_even(object_mesh, count=round(num_query_pts*1.3))[0]
-                query_points_surface = down_sampling(query_points_surface, num_query_pts)
-            
-            occupancy_surface = np.ones(query_points_surface.shape[0])
-            signed_distances_surface = np.zeros(query_points_surface.shape[0])
-            
+            ### Points belongs to the object volume   
+            query_points_volume = full_pc
+            occupancy_volume = np.ones(query_points_volume.shape[0])
+            signed_distances_volume = signed_distance_full_pc   #trimesh.proximity.signed_distance(object_mesh, query_points_volume)  
+            num_query_pts = query_points_volume.shape[0]         
 
             ### Random points (both outside and inside object mesh)   
-            signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
-            # print("min_signed_distance_full_pc:", min(signed_distance_full_pc), max(signed_distance_full_pc))
-            query_points_random, signed_distances_random, \
-            outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
-                                boundary_threshold=[0.02, min(signed_distance_full_pc)], \
-                                num_pts=round(num_query_pts), scales=[1.5]*3, vis=False, seed=None, verbose=False)      
+            outside_mesh_idxs = None
+            while(outside_mesh_idxs is None or outside_mesh_idxs.shape[0] < num_query_pts):                
+                query_points_random, signed_distances_random, \
+                outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
+                                    boundary_threshold=[0.02, min(signed_distance_full_pc)], \
+                                    num_pts=round(num_query_pts*1.3), scales=[1.5]*3, vis=False, seed=None, verbose=False)  
                 
-            occupancy_random = np.ones(num_query_pts)
-            occupancy_random[outside_mesh_idxs] = 0
+                
+            outside_mesh_idxs = outside_mesh_idxs[:num_query_pts]
+            query_points_random = query_points_random[outside_mesh_idxs]
+            occupancy_random = np.zeros(num_query_pts)
+            signed_distances_random = signed_distances_random[outside_mesh_idxs]
 
             
-            all_query_points = np.concatenate((query_points_surface, query_points_random), axis=0)
-            all_occupancies = np.concatenate((occupancy_surface, occupancy_random), axis=0)     
-            all_signed_distances = np.concatenate((signed_distances_surface, signed_distances_random), axis=0)        
+            all_query_points = np.concatenate((query_points_volume, query_points_random), axis=0)
+            all_occupancies = np.concatenate((occupancy_volume, occupancy_random), axis=0)     
+            all_signed_distances = np.concatenate((signed_distances_volume, signed_distances_random), axis=0)        
             
             
             processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     

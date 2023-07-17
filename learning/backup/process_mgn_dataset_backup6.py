@@ -20,14 +20,14 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 mgn_dataset_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset"
 raw_data_path = os.path.join(mgn_dataset_main_path, "raw_pickle_data")
 data_path = os.path.join(mgn_dataset_main_path, "filtered_data")
-data_processed_path = os.path.join(mgn_dataset_main_path, "shinghei_data_sdf")
+data_processed_path = os.path.join(mgn_dataset_main_path, "shinghei_data_2")
 os.makedirs(data_processed_path, exist_ok=True)
 
 start_time = timeit.default_timer()
 visualization = False
 verbose = False
 num_pts = 1024
-# num_query_pts = 10000
+num_query_pts = 10000
 data_point_count = len(os.listdir(data_processed_path))
 
 fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
@@ -42,7 +42,7 @@ excluded_objects = \
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
 # for idx, object_name in enumerate(["sphere04"]):
 # for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["ellipsoid01-p2"]):
+for idx, file_name in enumerate(["ellipsoid01-p1"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -56,15 +56,16 @@ for idx, file_name in enumerate(["ellipsoid01-p2"]):
         print_color(f"{object_name} is not processed (type 2)")
         continue 
     
-    real_object_name = object_name
-    if "-p1" in object_name or "-p2" in object_name:
-        real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.
+    # real_object_name = object_name
+    # if "-p1" in object_name or "-p2" in object_name:
+    #     real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.
 
-    ### Get partial point clouds
-    with open(os.path.join(static_data_recording_path, f"{real_object_name}.pickle"), 'rb') as handle:
-        static_data = pickle.load(handle)
-    tri_indices = static_data["tri_indices"]
+    # ### Get partial point clouds
+    # with open(os.path.join(static_data_recording_path, f"{real_object_name}.pickle"), 'rb') as handle:
+    #     static_data = pickle.load(handle)
     # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
+    # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud   (to match with Isabella's data)
+    # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values
     
     # # if visualization:
     # #     pcds = []
@@ -72,10 +73,7 @@ for idx, file_name in enumerate(["ellipsoid01-p2"]):
     # #         pcds.append(pcd_ize(pc, color=[0,0,0]).translate((0,0.05*j,0)))
     # #     open3d.visualization.draw_geometries(pcds)
         
-        
     for k in range(0,100):    # 100 grasp poses
-        
-        print(f"{object_name} - grasp {k} started. Time passed: {(timeit.default_timer() - start_time)/60:.2f}\n")
         
         file_name = os.path.join(data_path, f"{object_name}_grasp_{k}.pickle")        
         if not os.path.isfile(file_name):
@@ -91,55 +89,69 @@ for idx, file_name in enumerate(["ellipsoid01-p2"]):
         tet_indices = data["tet_indices"]
         young_modulus = data["young_modulus"]
         
+        # gripper_pc = data["gripper_pc"]
+        # augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), (gripper_pc.shape[0], 1)))) # shape (num_pts,5)
 
-        if visualization:    
-            for i in range(49,50):
-                pcd_full = pcd_ize(full_pcs[i], color=[0,0,0])
-                colors = np.array(scalar_to_rgb(stresses[i], colormap='jet'))[:,:3]
-                pcd_full.colors = open3d.utility.Vector3dVector(colors)
+        # if visualization:    
+        #     for i in range(49,50):
+        #         pcd_full = pcd_ize(full_pcs[i], color=[0,0,0])
+        #         colors = np.array(scalar_to_rgb(stresses[i], colormap='jet'))[:,:3]
+        #         pcd_full.colors = open3d.utility.Vector3dVector(colors)
 
-                # pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
-                # pcd_partial = pcd_ize(partial_pcs[0], color=[1,0,0])    # just visualize partial pc from one of the camera
-                # open3d.visualization.draw_geometries([pcd_full.translate((-0.05,0,-0.05)), pcd_gripper, pcd_partial])
-
-                mesh = open3d.geometry.TriangleMesh()
-                mesh.vertices = open3d.utility.Vector3dVector(full_pcs[i])
-                mesh.triangles = open3d.utility.Vector3iVector(np.array(tri_indices).astype(np.int32))
+        #         pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
+        #         pcd_partial = pcd_ize(partial_pcs[0], color=[1,0,0])    # just visualize partial pc from one of the camera
+        #         open3d.visualization.draw_geometries([pcd_full.translate((-0.05,0,-0.05)), pcd_gripper, pcd_partial])
                 
-                open3d.visualization.draw_geometries([mesh, pcd_full.translate((0.07,0,0))])
-                
-                break
+        #         break
         
-        num_query_pts = full_pcs[0].shape[0]
+        # num_query_pts = full_pcs[0].shape[0]
         for i in range(0,50):     # 50 time steps. Takes ~0.40 mins to process
             force = forces[i]  
             full_pc = full_pcs[i]
 
-            ### Points belongs the object volume            
-            query_points = full_pc
-            stress = stresses[i]
+            # Points belongs the object volume            
+            selected_idxs = np.arange(full_pc.shape[0]) 
+            query_points = full_pc[selected_idxs]
+            stress = stresses[i][selected_idxs]
+            # occupancy = np.ones(stress.shape)
+            
+            num_duplicates = np.ceil(num_query_pts / full_pcs[0].shape[0])
+            query_points = np.repeat(query_points, num_duplicates, axis=0)[:num_query_pts]
+            stress = np.repeat(stress, num_duplicates, axis=0)[:num_query_pts]
             occupancy = np.ones(stress.shape)
-            
-               
-            ### Random points (outside object mesh)  
-            object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
-            signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
-            
+            # print(query_points.shape, stress.shape, occupancy.shape)
+            # pcd_ize(query_points, color=[0,0,0], vis=True)
+                
+            # Random points (outside object mesh)  
             outside_mesh_idxs = None
             while(outside_mesh_idxs is None or outside_mesh_idxs.shape[0] < num_query_pts):
-                # sampled_points = sample_points_bounding_box(trimesh.PointCloud(full_pc), round(num_query_pts*1.7), scales=[1.2]*3) 
-                # is_inside = is_inside_tet_mesh_vectorized(sampled_points, vertices=full_pc, tet_indices=tet_indices)
-                # outside_mesh_idxs = np.where(is_inside == False)[0]
-
-                query_points_random, signed_distances_random, \
-                outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
-                                    boundary_threshold=[0.02, min(signed_distance_full_pc)], \
-                                    num_pts=round(num_query_pts*1.5), scales=[1.5]*3, vis=False, seed=None, verbose=False)                 
+                sampled_points = sample_points_bounding_box(trimesh.PointCloud(full_pc), round(num_query_pts*1.7), scales=[1.2]*3) 
+                is_inside = is_inside_tet_mesh_vectorized(sampled_points, vertices=full_pc, tet_indices=tet_indices)
+                outside_mesh_idxs = np.where(is_inside == False)[0]
+                
                 # print(f"num_outside/total: {outside_mesh_idxs.shape[0]}/{num_query_pts}")
-
-                            
+  
+            if visualization:
+                pcds = []
+                pcd_full = pcd_ize(full_pc, color=[0,0,0])
+                # for i, query in enumerate(sampled_points):
+                #     query_sphere = open3d.geometry.TriangleMesh.create_sphere(radius=0.001)
+                #     if i in outside_mesh_idxs:
+                #         color = [1,0,0]
+                #     else:
+                #         color = [0,0,1]
+                #     query_sphere.paint_uniform_color(color)
+                #     query_sphere.translate(tuple(query))    
+                #     pcds.append(query_sphere)
+                # open3d.visualization.draw_geometries(pcds + [pcd_full])  
+                pcd_outside = pcd_ize(sampled_points[outside_mesh_idxs], color=[1,0,0])   
+                inside_mesh_idxs = np.where(is_inside == True)[0]             
+                pcd_inside = pcd_ize(sampled_points[inside_mesh_idxs], color=[0,1,0])
+                open3d.visualization.draw_geometries([pcd_outside.translate((0.09,0,0)), pcd_inside.translate((-0.09,0,0)), pcd_full])
+                 
+            
             outside_mesh_idxs = outside_mesh_idxs[:num_query_pts] # only select num_query_pts queries
-            query_points_outside = query_points_random[outside_mesh_idxs]
+            query_points_outside = sampled_points[outside_mesh_idxs]
             stress_outside = 0.0001 * np.ones(outside_mesh_idxs.shape[0])     #-4 * np.ones(outside_mesh_idxs.shape[0])
             occupancy_outside = np.zeros(stress_outside.shape)
 

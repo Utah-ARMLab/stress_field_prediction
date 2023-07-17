@@ -365,8 +365,8 @@ class StaticDataCollection:
 
             object_height_buffer = 0.001
 
-            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
-            # print_color(f"{pose.p}")
+            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
+            # # print_color(f"{pose.p}")
 
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,
                                                   f"object_{i}", collision_group,
@@ -404,12 +404,12 @@ class StaticDataCollection:
 
             frame_count += 1
             if frame_count == 2:
-                # output_file = "/home/baothach/Downloads/test_cam_views.png"
-                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}.png"
+                # # output_file = "/home/baothach/Downloads/test_cam_views.png"
+                # output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}.png"
 
                 
-                visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+                # visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+                #                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
                 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
                 os.makedirs(static_data_recording_path, exist_ok=True)
@@ -422,18 +422,24 @@ class StaticDataCollection:
                     partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])  # shape (1,num_pts,3)
 
                 partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)  # shape (8,num_pts,3)
-                # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
-                # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
+                partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
+                partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
-                data = {"partial_pcs": partial_pcs}
+                (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
+                tri_indices = np.array(tri_indices).reshape(-1,3)
+                # print(tri_indices.shape)
+
+                data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
                    
-                # pcds = []
-                # for pc in partial_pcs:
-                #     pcds.append(pcd_ize(pc))
-                # open3d.visualization.draw_geometries(pcds) 
+                # # pcds = []
+                # # for pc in partial_pcs:
+                # #     pcds.append(pcd_ize(pc))
+                # # open3d.visualization.draw_geometries(pcds) 
+
+
 
 
                 all_done = True
