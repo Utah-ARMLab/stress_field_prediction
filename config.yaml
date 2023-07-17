@@ -1,6 +1,6 @@
 
 
-use_viewer: True
+use_viewer: False
 replace_existing_results: False
 write_results: True
 

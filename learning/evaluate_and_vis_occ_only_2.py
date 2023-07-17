@@ -9,7 +9,7 @@ from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
-from model import StressNetOccupancyOnly2
+from model import StressNetOccupancyOnly
 
 
 
@@ -34,8 +34,8 @@ force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
     
 
 device = torch.device("cuda")
-model = StressNetOccupancyOnly2(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run3(occupancy_only)/epoch 57"))
+model = StressNetOccupancyOnly(num_channels=5).to(device)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run1(conv1d)/epoch 150"))
 model.eval()
 
 
@@ -85,8 +85,9 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
         
         ### Load robot gripper point cloud
         gripper_pc = data["gripper_pc"]     
-        gripper_pc_tensor = torch.from_numpy(gripper_pc).permute(1,0).float()  # shape (B, 3, num_pts)
-        gripper_pc_tensor = gripper_pc_tensor.unsqueeze(0).repeat(1,1,1).to(device)  # shape (B, 8, 3, num_pts)
+        augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), 
+                                        (gripper_pc.shape[0], 1)))) # shape (num_pts,5)
+        augmented_gripper_pc = np.tile(augmented_gripper_pc[np.newaxis, :, :], (8, 1, 1)) # shape (8,num_pts,5)
         pcd_gripper = pcd_ize(gripper_pc, color=(0,0,0))
 
 
@@ -103,7 +104,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
         # open3d.visualization.draw_geometries(pcds)
 
 
-        for i in range(49,50):     # 50 time steps. Takes ~0.40 mins to process
+        for i in range(0,50):     # 50 time steps. Takes ~0.40 mins to process
 
             query_data = read_pickle_data(data_path=os.path.join(dataset_path, f"processed sample {i}.pickle"))  # shape (B, 3)
             test_stress = query_data["stress_log"]
@@ -113,60 +114,61 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
           
 
             force = forces[i]  
+            print("force:", force)
             full_pc = full_pcs[i]
 
             augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
                                                     (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
-            object_pc_tensor = torch.from_numpy(augmented_partial_pcs[1:2,:,:]).permute(0,2,1).float().to(device)  # shape (B, 8, 5, num_pts) 
-
+        
+            ### Combine object pc and gripper pc
+            combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1)[0:1,:,:] # shape (8, num_pts*2, 5)
+            combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
             
             
             ### Get query points (sample randomly or use the ground-truth particles)
             if query_type == "sampled":
-                # query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3) 
+                # query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.2]*3)  # shape (num_query_pts,3) 
                 
                 # query = full_pc
                 query = test_query
                 is_inside = is_inside_tet_mesh_vectorized(query, vertices=full_pc, tet_indices=tet_indices).astype(int)
 
-            # pcd_test = pcd_ize(query[np.where(is_inside)[0]], color=[0,0,0], vis=True)
-            
-            
+            pcd_test = pcd_ize(test_query[np.where(test_occ==0)[0]], color=[0,0,0], vis=True)
             
             query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
-            query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)            
-            print(object_pc_tensor.shape, gripper_pc_tensor.shape, query_tensor.shape)
-            
-            occupancy = model(object_pc_tensor, gripper_pc_tensor, query_tensor) # shape (8*num_queries,1)
+            query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
+            occupancy = model(combined_pc_tensor, query_tensor) # shape (8*num_queries,1)
 
             predicted_classes = (occupancy >= 0.5).int().squeeze().cpu().detach().numpy()
+            print(predicted_classes.shape, is_inside.shape)
             print("Accuracy:", np.sum(predicted_classes == is_inside)/is_inside.shape[0])
 
             
             # stress = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             # occupancy = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            # occupied_idxs = np.where(pred_occupancy >= 0.8)[0]
-            occupied_idxs = np.where(predicted_classes != is_inside)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
+            # occupied_idxs = np.where(predicted_classes == is_inside)[0]
             # occupied_idxs_2 = np.where(predicted_classes == 1)[0]
             # occupied_idxs = np.intersect1d(occupied_idxs, occupied_idxs_2)
             
-            print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)
-            
+            print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)       
             print(np.count_nonzero(is_inside[occupied_idxs] == 1), np.count_nonzero(is_inside[occupied_idxs] == 0), np.count_nonzero(predicted_classes[occupied_idxs] == 1))
-            # print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
-            print(np.sum(is_inside == test_occ), test_occ.shape[0])
-            wrong_labels = np.where(is_inside != test_occ)[0]
-            print(np.count_nonzero(is_inside[wrong_labels] == 1), np.count_nonzero(test_occ[wrong_labels] == 1))
             
-            pcd_wrong = pcd_ize(query[wrong_labels], color=[0,1,0])
+            # print(np.sum(is_inside == test_occ), test_occ.shape[0])
+            # wrong_labels = np.where(is_inside != test_occ)[0]
+            # print(np.count_nonzero(is_inside[wrong_labels] == 1), np.count_nonzero(test_occ[wrong_labels] == 1))
+            # # print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
+            # pcd_wrong = pcd_ize(query[wrong_labels], color=[0,1,0])
 
-            pcd_gt = pcd_ize(full_pc, color=[1,0,0])
+            # pcd_gt = pcd_ize(full_pc, color=[1,0,0])
 
-            pcd = pcd_ize(query[occupied_idxs], color=[0,0,0])
+            # pcd = pcd_ize(query[occupied_idxs], color=[0,0,0])
+            
+            # pcd_bad = pcd_ize(query[np.where(predicted_classes != is_inside)[0]], color=[0,0,0])
 
-            # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
-            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_wrong])
+            # # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
+            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_bad.translate((0.14,0,0))])
             
             
             print_color("========================")
@@ -177,7 +179,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             break
         
-        break
+        # break
 
 
 

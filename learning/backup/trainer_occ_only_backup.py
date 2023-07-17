@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
-from model import StressNetOccupancyOnly2
-from dataset_loader import StressPredictionDataset4
+from model import StressNetOccupancyOnly
+from dataset_loader import StressPredictionDataset3
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -14,7 +14,6 @@ import numpy as np
 import sys
 sys.path.append("../")
 from utils.miscellaneous_utils import print_color
-np.set_printoptions(threshold=np.inf)
 
 
 train_stress_losses = []
@@ -35,29 +34,22 @@ def train(model, device, train_loader, optimizer, epoch):
     for batch_idx, sample in enumerate(train_loader):
         num_batch += 1
             
-        object_pc = sample["object_pc"].to(device)
-        gripper_pc = sample["gripper_pc"].to(device)
+        pc = sample["pc"].to(device)
         query = sample["query"].to(device)
-        target_occupancy = sample["occupancy"].to(device)  # shape (B, 8, 1)
-        
-        
-        print(target_occupancy.shape, query.shape, object_pc.shape)
+        target_occupancy = sample["occupancy"].to(device)
                
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-        print(target_occupancy.squeeze().cpu().detach().numpy())
 
-        object_pc = object_pc.view(-1, object_pc.shape[2], object_pc.shape[3])  # shape (B*8, 5, num_pts)
-        gripper_pc = gripper_pc.view(-1, gripper_pc.shape[2], gripper_pc.shape[3])  # shape (B*8, 3, num_pts)
-        
+
+        pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
 
-        # print(target_occupancy.shape)
-        # print(object_pc.shape, gripper_pc.shape, query.shape)
+        # print(target_stress.shape, target_occupancy.shape)
+        # print(pc.shape, query.shape)
 
             
         optimizer.zero_grad()
-        output = model(object_pc, gripper_pc, query)
-        # print(target_occupancy.shape, output.shape)
+        output = model(pc, query)
 
         predicted_classes = (output >= 0.5).squeeze().int()
         batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
@@ -83,7 +75,7 @@ def train(model, device, train_loader, optimizer, epoch):
        
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
             train_stress_losses.append(loss_occ.item())
-            train_accuracies.append(100.* batch_correct / object_pc.shape[0])
+            train_accuracies.append(100.* batch_correct / pc.shape[0])
     
     
     print('(Train set) Average stress loss: {:.3f}'.format(
@@ -107,20 +99,18 @@ def test(model, device, test_loader, epoch):
     with torch.no_grad():
         for batch_idx, sample in enumerate(test_loader):
            
-            object_pc = sample["object_pc"].to(device)
-            gripper_pc = sample["gripper_pc"].to(device)
+            pc = sample["pc"].to(device)
             query = sample["query"].to(device)
             target_occupancy = sample["occupancy"].to(device)
 
             target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
 
-            object_pc = object_pc.view(-1, object_pc.shape[2], object_pc.shape[3])  # shape (B*8, 5, num_pts)
-            gripper_pc = gripper_pc.view(-1, gripper_pc.shape[2], gripper_pc.shape[3])  # shape (B*8, 3, num_pts)
-            
+
+            pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
             query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
             
             
-            output = model(object_pc, gripper_pc, query)
+            output = model(pc, query)
                     
                     
             loss_occ = nn.BCELoss()(output, target_occupancy)        
@@ -134,7 +124,7 @@ def test(model, device, test_loader, epoch):
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
             test_stress_losses.append(loss_occ.item())
-            test_accuracies.append(100.* batch_correct / object_pc.shape[0])      
+            test_accuracies.append(100.* batch_correct / pc.shape[0])      
                             
 
     test_loss /= len(test_loader.dataset)
@@ -157,7 +147,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/test)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(occupancy_only)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -170,13 +160,13 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
-    dataset = StressPredictionDataset4(dataset_path)
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_2"
+    dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
-    batch_size = 15     
+    batch_size = 8     
     
-    train_len = 1#round(dataset_size*0.9)
-    test_len = 1#round(dataset_size*0.1)-1
+    train_len = round(dataset_size*0.9)
+    test_len = round(dataset_size*0.1)-1
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap
@@ -200,7 +190,7 @@ if __name__ == "__main__":
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    model = StressNetOccupancyOnly2(num_channels=5).to(device)
+    model = StressNetOccupancyOnly(num_channels=5).to(device)
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
@@ -218,12 +208,12 @@ if __name__ == "__main__":
         scheduler.step()
         test(model, device, test_loader, epoch)
         
-        # if epoch % 1 == 0:            
-        #     torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
+        if epoch % 1 == 0:            
+            torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
             
-        # saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
-        #         "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
-        # with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
-        #     pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+        saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
+                "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
+        with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
+            pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
             
         

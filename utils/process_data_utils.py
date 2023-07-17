@@ -9,7 +9,7 @@ import numpy as np
 
 def get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=1024, gripper_name='panda'):
     gripper = create_gripper(gripper_name, configuration=fingers_joint_angles, 
-                             franka_gripper_mesh_main_path="../graspsampling-py-defgraspsim", finger_only=True)
+                             franka_gripper_mesh_main_path="../../graspsampling-py-defgraspsim", finger_only=True)
     transformation_matrix = poses_wxyz_to_mats(grasp_pose)[0]
     mesh = gripper.mesh.copy()
     mesh.apply_transform(transformation_matrix)
@@ -132,19 +132,24 @@ def sample_and_compute_signed_distance(tri_indices, full_pc, boundary_threshold,
         np_triangles = np.array(tri_indices).reshape(-1,3).astype(np.int32)
         mesh.vertices = open3d.utility.Vector3dVector(np_vertices)
         mesh.triangles = open3d.utility.Vector3iVector(np_triangles)
-        pcds = [mesh]
-        for i, query in enumerate(queries):
-            query_sphere = open3d.geometry.TriangleMesh.create_sphere(radius=0.01)
-            if i in outside_mesh_idxs:
-                color = [1,0,0]
-            else:
-                color = [0,0,1]
-            query_sphere.paint_uniform_color(color)
-            query_sphere.translate(tuple(query))    
-            pcds.append(query_sphere)
-        open3d.visualization.draw_geometries(pcds)     
+        # pcds = [mesh]
+        # for i, query in enumerate(queries):
+        #     query_sphere = open3d.geometry.TriangleMesh.create_sphere(radius=0.01)
+        #     if i in outside_mesh_idxs:
+        #         color = [1,0,0]
+        #     else:
+        #         color = [0,0,1]
+        #     query_sphere.paint_uniform_color(color)
+        #     query_sphere.translate(tuple(query))    
+        #     pcds.append(query_sphere)
+        # open3d.visualization.draw_geometries(pcds)     
+
+        pcd_outside = pcd_ize(queries[outside_mesh_idxs], color=[1,0,0])   
+        inside_mesh_idxs = np.where(signed_distances >= boundary_threshold[1])[0]           
+        pcd_inside = pcd_ize(queries[inside_mesh_idxs], color=[0,1,0])
+        open3d.visualization.draw_geometries([pcd_outside.translate((0.09,0,0)), pcd_inside.translate((-0.09,0,0)), mesh])
         
-    return queries, outside_mesh_idxs
+    return queries, signed_distances, outside_mesh_idxs
 
 
 # def reconstruct_stress_field(model, device, batch_size, tri_indices, occupancy_threshold, full_pc, 
