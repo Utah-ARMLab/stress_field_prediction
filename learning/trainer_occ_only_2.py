@@ -148,7 +148,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/run2(occ_only)"
+        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/ellipsoid01"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -161,10 +161,10 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_sdf"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01"
     dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
-    batch_size = 400     
+    batch_size = 20     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)-1

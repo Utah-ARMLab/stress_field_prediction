@@ -48,8 +48,8 @@ def train(model, device, train_loader, optimizer, epoch):
         pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
 
-        # print(target_signed_distance.shape)
-        # print(pc.shape, query.shape)
+        print(target_occupancy.shape)
+        print(pc.shape, query.shape)
 
             
         optimizer.zero_grad()
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/run2(occ)"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/cuboid01_2"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -178,13 +178,14 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_2"
+    # dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_cuboid01"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_cuboid01"
     dataset = StressPredictionDataset(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 150     
     
-    train_len = round(dataset_size*0.9)
-    test_len = round(dataset_size*0.1)-1
+    train_len = 1#round(dataset_size*0.9)
+    test_len = 1#round(dataset_size*0.1)-1
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap

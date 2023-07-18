@@ -18,11 +18,11 @@ Process data collected by Bao
 """
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_cuboid01_big"
 os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/data"
-data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data"
+data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_cuboid01"
 os.makedirs(data_processed_path, exist_ok=True)
 
 data_point_count = len(os.listdir(data_processed_path))
@@ -35,12 +35,12 @@ grasp_idx_bounds = [0, 100]
 force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
 
 # for object_name in OBJECT_NAMES:
-for object_name in ["6polygon04"]:
+for object_name in ["cuboid01"]:
 
     for grasp_idx in range(*grasp_idx_bounds):        
         print(f"{object_name} - grasp {grasp_idx} started. Time passed: {timeit.default_timer() - start_time}")
         
-        get_gripper_pc = False#True
+        get_gripper_pc = True
         
         for force in force_levels:
             
@@ -69,29 +69,35 @@ for object_name in ["6polygon04"]:
             fingers_joint_angles[1] += 0.005
 
                 
+            
+            
+                
             if get_gripper_pc:
-                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
+                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts, finger_only=False)
+                # gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts, gripper_name="panda_franka_link7_longfingers")
                 gripper_data = {"gripper_pc": gripper_pc}
                 save_path = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{grasp_idx}.pickle")
                 write_pickle_data(gripper_data, save_path)
                 
                 get_gripper_pc = False
+                
+                # pcd_ize(gripper_pc, color=[0,0,0], vis=True)
 
            
             
-            if visualization:
+            # if visualization:
 
-                ### Get partial point clouds
-                with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
-                    static_data = pickle.load(handle)
-                partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
+            #     ### Get partial point clouds
+            #     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
+            #         static_data = pickle.load(handle)
+            #     partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
-                pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
-                pcd_full = pcd_ize(object_particle_state, color=[1,0,0])
-                pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
+            #     pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
+            #     pcd_full = pcd_ize(object_particle_state, color=[1,0,0])
+            #     pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
 
-                # open3d.visualization.draw_geometries([pcd_partial, pcd_full, pcd_gripper])
-                open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
+            #     # open3d.visualization.draw_geometries([pcd_partial, pcd_full, pcd_gripper])
+            #     open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
 
 
             full_pc = object_particle_state
@@ -125,19 +131,19 @@ for object_name in ["6polygon04"]:
             all_signed_distances = np.concatenate((signed_distances_surface, signed_distances_random), axis=0)        
             
             
-            processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
-                            "signed_distance": all_signed_distances, "force": force, 
-                            "young_modulus": np.log(young_modulus), 
-                            "object_name": object_name, "grasp_idx": grasp_idx}
+            # processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
+            #                 "signed_distance": all_signed_distances, "force": force, 
+            #                 "young_modulus": np.log(young_modulus), 
+            #                 "object_name": object_name, "grasp_idx": grasp_idx}
                                         
 
-            with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-                pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            # with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+            #     pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
                 
-            data_point_count += 1    
+            # data_point_count += 1    
 
 
-            # break
+        #     break
         # break
         
         

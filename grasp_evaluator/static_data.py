@@ -365,7 +365,7 @@ class StaticDataCollection:
 
             object_height_buffer = 0.001
 
-            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
+            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
             # # print_color(f"{pose.p}")
 
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,
@@ -422,8 +422,8 @@ class StaticDataCollection:
                     partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])  # shape (1,num_pts,3)
 
                 partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)  # shape (8,num_pts,3)
-                partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
-                partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
+                # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
+                # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
                 (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
                 tri_indices = np.array(tri_indices).reshape(-1,3)

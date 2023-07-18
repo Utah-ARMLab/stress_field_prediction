@@ -74,7 +74,7 @@ def train(model, device, train_loader, optimizer, epoch):
         # loss_stress /= 95
         loss_occ *= 95
         
-        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
+        print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
         
         
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/run1(combined)"
+        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/ellipsoid01(combined)"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_sdf"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01"
     dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 30     

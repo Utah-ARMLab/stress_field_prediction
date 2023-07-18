@@ -12,9 +12,9 @@ from utils.constants import OBJECT_NAMES
 from model_ori import StressNetSDF, StressNetOccupancyOnly
 
 
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_cuboid01"
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data"
+dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_cuboid01"
 
 start_time = timeit.default_timer() 
 visualization = False
@@ -33,13 +33,13 @@ force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
 device = torch.device("cuda")
 model = StressNetOccupancyOnly(num_channels=5).to(device)
 # model = StressNetSDF(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/run1(occ)/epoch 150"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/cuboid01_2/epoch 150"))
 model.eval()
 
 
 fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
 selected_primitive_names = ["6polygon", "8polygon", "cuboid", "cylinder", "sphere", "ellipsoid"]
-selected_primitive_names = ["ellipsoid"]
+# selected_primitive_names = ["ellipsoid"]
 
 excluded_objects = \
 [f"6polygon0{i}" for i in [1,3]] + [f"8polygon0{i}" for i in [1,3]] + \
@@ -49,7 +49,7 @@ excluded_objects = \
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
 # for idx, object_name in enumerate(["sphere04"]):
 # for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["6polygon04"]):
+for idx, file_name in enumerate(["cuboid01"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -142,13 +142,13 @@ for idx, file_name in enumerate(["6polygon04"]):
 
             pcd_gt = pcd_ize(query[occupied_idxs], color=[1,0,0])
 
-            pcd = pcd_ize(full_pc, color=[0,0,0])
+            pcd = pcd_ize(full_pc, color=[0,1,0])
             
             # pcd_bad = pcd_ize(query[np.where(predicted_classes != test_occ)[0]], color=[0,0,0])
 
             # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
             # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_bad.translate((0.14,0,0))])
-            open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt])
+            open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
             
             
             print_color("========================")

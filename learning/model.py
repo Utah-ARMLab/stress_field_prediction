@@ -385,11 +385,11 @@ class StressNetOccupancyOnly2(nn.Module):
     '''
     Stress Prediction
     '''
-    def __init__(self, num_channels):
+    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D):
         super(StressNetOccupancyOnly2, self).__init__()
         
-        self.object_encoder = PointCloudEncoder(num_channels=num_channels)  # object point cloud
-        self.gripper_encoder = PointCloudEncoder(num_channels=3)  # gripper point cloud
+        self.object_encoder = pc_encoder_type(num_channels=num_channels)  # object point cloud
+        self.gripper_encoder = pc_encoder_type(num_channels=3)  # gripper point cloud
         self.qr_embedder = QueryEmbedderOccupancyOnly2()
 
     def forward(self, object, gripper, query):
@@ -413,7 +413,68 @@ class StressNetOccupancyOnly2(nn.Module):
         
         return x_occ
 
+class QueryEmbedderSDF(nn.Module):
+    '''
+    Stress Prediction
+    '''
+    def __init__(self):
+        super(QueryEmbedderSDF, self).__init__()
+        
+        # FC layers for query point
+        self.fc1_query = nn.Linear(3, 64)
+        self.bn1_query = nn.GroupNorm(1, 64)
+        self.fc2_query = nn.Linear(64, 128)
+        self.bn2_query = nn.GroupNorm(1, 128)
+        self.fc3_query = nn.Linear(128, 256)
+        self.bn3_query = nn.GroupNorm(1, 256)
 
+        # FC layers to predict signed distance (scalar)
+        self.fc1_sdf = nn.Linear(512, 256)
+        self.bn1_sdf = nn.GroupNorm(1, 256) 
+        self.fc2_sdf = nn.Linear(256, 128)
+        self.bn2_sdf = nn.GroupNorm(1, 128)
+        self.fc3_sdf = nn.Linear(128, 1)
+
+
+    def forward(self, pc_embedding, query):
+   
+        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        
+        x = torch.cat((pc_embedding, x_qr),dim=-1)
+        
+        x_sdf = F.relu(self.bn1_sdf(self.fc1_sdf(x)))
+        x_sdf = F.relu(self.bn2_sdf(self.fc2_sdf(x_sdf)))
+        x_sdf = self.fc3_sdf(x_sdf)
+
+        return x_sdf 
+    
+class StressNetSDF(nn.Module):
+    '''
+    Stress Prediction
+    '''
+    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D):
+        super(StressNetSDF, self).__init__()
+        
+        self.pc_encoder = pc_encoder_type(num_channels=num_channels)
+        self.qr_embedder = QueryEmbedderSDF()
+
+    def forward(self, pc, query):
+        """ 
+        pc: shape (B, 5, num_points)
+        query: shape (B, num_qrs, 3)
+        """
+        
+        num_qrs = query.shape[1]
+        
+        x = self.pc_encoder(pc).squeeze() # shape (B, 256)
+
+        x = x.unsqueeze(1).repeat(1, num_qrs, 1) # shape (B, num_qrs, 256)
+        x_sdf = self.qr_embedder(x.view(-1, 256), query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
+
+        
+        return x_sdf
 
 
 if __name__ == '__main__':

@@ -41,15 +41,15 @@ def train(model, device, train_loader, optimizer, epoch):
         target_occupancy = sample["occupancy"].to(device)  # shape (B, 8, 1)
         
         
-        print(target_occupancy.shape, query.shape, object_pc.shape)
+        # print(target_occupancy.shape, query.shape, object_pc.shape)
                
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-        print(target_occupancy.squeeze().cpu().detach().numpy())
+        # print(target_occupancy.squeeze().cpu().detach().numpy())
 
-        object_pc = object_pc.view(-1, object_pc.shape[2], object_pc.shape[3])  # shape (B*8, 5, num_pts)
-        gripper_pc = gripper_pc.view(-1, gripper_pc.shape[2], gripper_pc.shape[3])  # shape (B*8, 3, num_pts)
+        object_pc = object_pc.view(-1, object_pc.shape[-2], object_pc.shape[-1])  # shape (B*8, 5, num_pts)
+        gripper_pc = gripper_pc.view(-1, gripper_pc.shape[-2], gripper_pc.shape[-1])  # shape (B*8, 3, num_pts)
         
-        query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
+        query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
 
         # print(target_occupancy.shape)
         # print(object_pc.shape, gripper_pc.shape, query.shape)
@@ -114,10 +114,10 @@ def test(model, device, test_loader, epoch):
 
             target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
 
-            object_pc = object_pc.view(-1, object_pc.shape[2], object_pc.shape[3])  # shape (B*8, 5, num_pts)
-            gripper_pc = gripper_pc.view(-1, gripper_pc.shape[2], gripper_pc.shape[3])  # shape (B*8, 3, num_pts)
+            object_pc = object_pc.view(-1, object_pc.shape[-2], object_pc.shape[-1])  # shape (B*8, 5, num_pts)
+            gripper_pc = gripper_pc.view(-1, gripper_pc.shape[-2], gripper_pc.shape[-1])  # shape (B*8, 3, num_pts)
             
-            query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
+            query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
             
             
             output = model(object_pc, gripper_pc, query)
@@ -157,7 +157,8 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/test)"
+    weight_path = \
+        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/ellipsoid03-p1-separate"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -170,13 +171,13 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid03-p1"
     dataset = StressPredictionDataset4(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
-    batch_size = 15     
+    batch_size = 150     
     
-    train_len = 1#round(dataset_size*0.9)
-    test_len = 1#round(dataset_size*0.1)-1
+    train_len = round(dataset_size*0.9)
+    test_len = round(dataset_size*0.1)-1
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap
@@ -218,12 +219,12 @@ if __name__ == "__main__":
         scheduler.step()
         test(model, device, test_loader, epoch)
         
-        # if epoch % 1 == 0:            
-        #     torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
+        if epoch % 1 == 0:            
+            torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))
             
-        # saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
-        #         "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
-        # with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
-        #     pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+        saved_data = {"train_stress_losses": train_stress_losses, "test_stress_losses": test_stress_losses,
+                "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
+        with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
+            pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
             
         
