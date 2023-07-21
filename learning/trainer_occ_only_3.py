@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
-from model import StressNetOccupancyOnly
-from dataset_loader import StressPredictionDataset3
+from model import StressNetOccupancyOnly3
+from dataset_loader import StressPredictionDataset5
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -15,6 +15,9 @@ import sys
 sys.path.append("../")
 from utils.miscellaneous_utils import print_color
 
+""" 
+Train occupancy only. Use force as a separate channel, NOT a feature in the point cloud anymore.
+"""
 
 train_stress_losses = []
 test_stress_losses = []
@@ -35,21 +38,23 @@ def train(model, device, train_loader, optimizer, epoch):
         num_batch += 1
             
         pc = sample["pc"].to(device)
+        force = sample["force"].to(device)  # shape (B, 1)
         query = sample["query"].to(device)
         target_occupancy = sample["occupancy"].to(device)
                
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
 
 
-        pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
-        query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
+        pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B, 3, num_pts*2)
+        query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B, num_queries, 3)
 
         # print(target_occupancy.shape)
+        # print(force.shape)
         # print(pc.shape, query.shape)
 
             
         optimizer.zero_grad()
-        output = model(pc, query)
+        output = model(pc, force, query)
 
         predicted_classes = (output >= 0.5).squeeze().int()
         batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
@@ -148,7 +153,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new/ellipsoid01_test_all"
+        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new/sphere02"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -161,8 +166,8 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/ellipsoid01_test_all"
-    dataset = StressPredictionDataset3(dataset_path)
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/sphere02"
+    dataset = StressPredictionDataset5(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 150     
     
@@ -191,7 +196,7 @@ if __name__ == "__main__":
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    model = StressNetOccupancyOnly(num_channels=5).to(device)
+    model = StressNetOccupancyOnly3(num_channels=5).to(device)
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)

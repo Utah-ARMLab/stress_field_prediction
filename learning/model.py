@@ -413,6 +413,99 @@ class StressNetOccupancyOnly2(nn.Module):
         
         return x_occ
 
+class QueryEmbedderOccupancyOnly3(nn.Module):
+    '''
+    Stress Prediction
+    '''
+    def __init__(self):
+        super(QueryEmbedderOccupancyOnly3, self).__init__()
+        
+        # FC layers for query point
+        self.fc1_query = nn.Linear(3, 64)
+        self.bn1_query = nn.GroupNorm(1, 64)
+        self.fc2_query = nn.Linear(64, 128)
+        self.bn2_query = nn.GroupNorm(1, 128)
+        self.fc3_query = nn.Linear(128, 256)
+        self.bn3_query = nn.GroupNorm(1, 256)
+
+        # FC layers to predict occupancy (0 or 1)
+        self.fc1_occ = nn.Linear(256*3, 256)
+        self.bn1_occ = nn.GroupNorm(1, 256) 
+        self.fc2_occ = nn.Linear(256, 128)
+        self.bn2_occ = nn.GroupNorm(1, 128)
+        self.fc3_occ = nn.Linear(128, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, pc_embedding, force_embedding, query):
+       
+        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        
+        x = torch.cat((pc_embedding, force_embedding, x_qr),dim=-1)
+        
+        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = self.fc3_occ(x_occ)
+        x_occ = self.sigmoid(x_occ)
+
+        return x_occ 
+
+class ForceEncoder(nn.Module):
+    '''
+    Stress Prediction
+    '''
+    def __init__(self):
+        super(ForceEncoder, self).__init__()
+        
+        # FC layers for force
+        self.fc1_force = nn.Linear(1, 64)
+        self.bn1_force = nn.GroupNorm(1, 64)
+        self.fc2_force = nn.Linear(64, 128)
+        self.bn2_force = nn.GroupNorm(1, 128)
+        self.fc3_force = nn.Linear(128, 256)
+        self.bn3_force  = nn.GroupNorm(1, 256)
+
+
+    def forward(self, force):
+       
+        x_force = F.relu(self.bn1_force(self.fc1_force(force)))
+        x_force = F.relu(self.bn2_force(self.fc2_force(x_force)))
+        x_force = F.relu(self.bn3_force(self.fc3_force(x_force)))
+        
+        return x_force 
+    
+class StressNetOccupancyOnly3(nn.Module):
+    '''
+    Stress Prediction
+    '''
+    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D):
+        super(StressNetOccupancyOnly3, self).__init__()
+        
+        self.pc_encoder = pc_encoder_type(num_channels=3)
+        self.force_encoder = ForceEncoder()
+        self.qr_embedder = QueryEmbedderOccupancyOnly3()
+
+    def forward(self, pc, force, query):
+        """ 
+        pc: shape (B, 5, num_points)
+        force: shape (B, 1)
+        query: shape (B, num_qrs, 3)
+        """
+        
+        num_qrs = query.shape[1]
+        
+        x_pc = self.pc_encoder(pc).squeeze() # shape (B, 256)
+        x_pc = x_pc.unsqueeze(1).repeat(1, num_qrs, 1) # shape (B, num_qrs, 256)
+
+        x_force = self.force_encoder(force).squeeze() # shape (B, 1)
+        x_force = x_force.unsqueeze(1).repeat(1, num_qrs, 1) # shape (B, num_qrs, 1)       
+               
+        x_occ = self.qr_embedder(x_pc.view(-1, 256), x_force.view(-1, 256), query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
+
+        
+        return x_occ
+
 class QueryEmbedderSDF(nn.Module):
     '''
     Stress Prediction

@@ -17,55 +17,34 @@ mgn_dataset_main_path = "/home/baothach/shape_servo_data/stress_field_prediction
 raw_data_path = os.path.join(mgn_dataset_main_path, "raw_pickle_data")
 filtered_data_path = os.path.join(mgn_dataset_main_path, "filtered_data")
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data"
-dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data"
+dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01-p1"
 
 start_time = timeit.default_timer() 
 visualization = False
 query_type = "sampled"  # options: sampled, full
 num_pts = 1024
 num_query_pts = 10000
-# stress_visualization_min = 0.001   
-# stress_visualization_max = 5e3 
-# log_stress_visualization_min = np.log(stress_visualization_min)   
-# log_stress_visualization_max = np.log(stress_visualization_max)    
 
-grasp_idx_bounds = [0, 1]
-force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
     
 
 device = torch.device("cuda")
-model = StressNet2(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run1/epoch 107"))
+model = StressNet2(num_channels=5).to(device)   # run5(occ_only_p1) run4(occ_only_6polygon04)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/ellipsoid01(combined)/epoch 60"))
 model.eval()
 
 
-fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
-selected_primitive_names = ["6polygon", "8polygon", "cuboid", "cylinder", "sphere", "ellipsoid"]
-selected_primitive_names = ["ellipsoid"]
 
-excluded_objects = \
-[f"6polygon0{i}" for i in [1,3]] + [f"8polygon0{i}" for i in [1,3]] + \
-[f"cylinder0{i}" for i in [1,2,3]] + [f"sphere0{i}" for i in [1,3]]
-# print("excluded_objects:", excluded_objects)
 
-# for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
-# for idx, object_name in enumerate(["sphere04"]):
-# for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["ellipsoid01-p1"]):
+
+for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6polygon04"
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
     print_color(f"{object_name}, {idx}")
     print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins")
 
-    if not any([prim_name in object_name for prim_name in selected_primitive_names]):   # if object does NOT belong to any of the selected primitives.
-        print_color(f"{object_name} is not processed (type 1)")
-        continue
-    if any([excluded_object in object_name for excluded_object in excluded_objects]):   # if object belongs to the excluded object list.
-        print_color(f"{object_name} is not processed (type 2)")
-        continue 
 
-    for k in range(0,100):    # 100 grasp poses
+    for k in range(5,100):    # 100 grasp poses
         
         file_name = os.path.join(filtered_data_path, f"{object_name}_grasp_{k}.pickle")        
         if not os.path.isfile(file_name):
@@ -96,20 +75,28 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
         real_object_name = object_name
         if "-p1" in object_name or "-p2" in object_name:
             real_object_name = real_object_name[:-3]  # Ignore the -p1 and -p2 part.
-        partial_pcs = read_pickle_data(data_path=os.path.join(static_data_recording_path, 
-                                        f"{real_object_name}.pickle"))["partial_pcs"]   # shape (8, num_pts, 3)
+        static_data = read_pickle_data(data_path=os.path.join(static_data_recording_path, 
+                                        f"{real_object_name}.pickle"))   # shape (8, num_pts, 3)
+        partial_pcs = static_data["partial_pcs"]
+        partial_pcs[..., 1] -= 1.0
+        tri_indices = static_data["tri_indices"]
+        # pcds = []
+        # for j, pc in enumerate(partial_pcs):
+        #     pcds.append(pcd_ize(pc, color=[0,1,0]).translate((0,0.00*j,0)))
+        # open3d.visualization.draw_geometries(pcds)
 
 
         for i in range(49,50):     # 50 time steps. Takes ~0.40 mins to process
 
-            query_data = read_pickle_data(data_path=os.path.join(dataset_path, f"processed sample {i}.pickle"))  # shape (B, 3)
-            test_stress = query_data["stress_log"]
-            test_query = query_data["query_points"]
-            num = test_stress.shape[0]
-            test_occ = query_data["occupancy"]
+            # query_data = read_pickle_data(data_path=os.path.join(dataset_path, f"processed sample {i}.pickle"))  # shape (B, 3)
+            # # test_stress = query_data["stress_log"]
+            # test_query = query_data["query_points"]
+            # # num = test_stress.shape[0]
+            # test_occ = query_data["occupancy"]
           
 
             force = forces[i]  
+            print("force:", force)
             full_pc = full_pcs[i]
 
             augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
@@ -122,10 +109,13 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             ### Get query points (sample randomly or use the ground-truth particles)
             if query_type == "sampled":
-                query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3) 
+                # query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3) 
                 
-                # query = full_pc
+               
+                query = full_pc
                 # query = test_query
+                
+                query[..., 1] -= 1.0
                 is_inside = is_inside_tet_mesh_vectorized(query, vertices=full_pc, tet_indices=tet_indices).astype(int)
 
             
@@ -138,32 +128,23 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             print("Accuracy:", np.sum(predicted_classes == is_inside)/is_inside.shape[0])
 
             
-            # stress = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
-            # occupancy = stress.view(8, num_query_pts, 1)  # shape (8, num_queries, 1)
             pred_stress = stress.squeeze().cpu().detach().numpy()  # shape (num_queries, 1)
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            # occupied_idxs = np.where(pred_occupancy >= 0.8)[0]
-            occupied_idxs = np.where(predicted_classes != is_inside)[0]
-            # occupied_idxs_2 = np.where(predicted_classes == 1)[0]
-            # occupied_idxs = np.intersect1d(occupied_idxs, occupied_idxs_2)
-            
-            pcd_test = pcd_ize(query[predicted_classes != is_inside[0]], color=[0,0,0], vis=True)
-            
-            print(np.where(predicted_classes != is_inside)[0].shape, np.where(predicted_classes == is_inside)[0].shape, query[occupied_idxs].shape)
-            
-            print(np.count_nonzero(is_inside[occupied_idxs] == 1), np.count_nonzero(is_inside[occupied_idxs] == 0), np.count_nonzero(predicted_classes[occupied_idxs] == 1))
-            print(is_inside[occupied_idxs], predicted_classes[occupied_idxs])
-            # # assert np.count_nonzero(is_inside[occupied_idxs] == 1) == 0
+            occupied_idxs = np.where(pred_occupancy >= 0.9)[0]
 
-            # pcd_gt = pcd_ize(full_pc, color=[0,0,0])
-            # colors = np.array(scalar_to_rgb(gt_stresses[i], colormap='jet'))[:,:3]
-            # pcd_gt.colors = open3d.utility.Vector3dVector(colors)
 
-            # pcd = pcd_ize(query[occupied_idxs])
-            # colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=min(gt_stresses[i]), max_val=max(gt_stresses[i])))[:,:3]
-            # pcd.colors = open3d.utility.Vector3dVector(colors)
+            pcd_gt = pcd_ize(full_pc, color=[0,0,0])
+            colors = np.array(scalar_to_rgb(gt_stresses[i], colormap='jet'))[:,:3]
+            pcd_gt.colors = open3d.utility.Vector3dVector(colors)
 
-            # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
+
+            predicted_volume = query[occupied_idxs] 
+            predicted_volume[..., 1] += 1.0
+            pcd = pcd_ize(predicted_volume)
+            colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=min(gt_stresses[i]), max_val=max(gt_stresses[i])))[:,:3]
+            pcd.colors = open3d.utility.Vector3dVector(colors)
+
+            open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
             
             
             print_color("========================")
@@ -173,7 +154,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):
             
             
             break
-        break
+        # break
 
 
 

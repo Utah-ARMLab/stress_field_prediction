@@ -20,14 +20,14 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 mgn_dataset_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset"
 raw_data_path = os.path.join(mgn_dataset_main_path, "raw_pickle_data")
 data_path = os.path.join(mgn_dataset_main_path, "filtered_data")
-data_processed_path = os.path.join(mgn_dataset_main_path, "sphere02")
+data_processed_path = os.path.join(mgn_dataset_main_path, "ellipsoid01_test_5")
 os.makedirs(data_processed_path, exist_ok=True)
 
 start_time = timeit.default_timer()
 visualization = False
 verbose = False
 num_pts = 1024
-num_query_pts = 4000#2000
+num_query_pts = 4000
 data_point_count = len(os.listdir(data_processed_path))
 
 fruit_names = ["apple", "lemon", "potato", "strawberry", "eggplant", "tomato", "cucumber"]
@@ -48,7 +48,7 @@ ellipsoid01-p2: 22, 23, 44, 46
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
 # for idx, object_name in enumerate(["sphere04"]):  ["sphere04", "ellipsoid03-p1", "ellipsoid02-p1"]
 # for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid01-p2" "6polygon04" "sphere04", "ellipsoid03-p1", "ellipsoid02-p1"
+for idx, file_name in enumerate(["ellipsoid01-p1"]):    # "ellipsoid01-p1", "ellipsoid01-p2" "6polygon04" "sphere04", "ellipsoid03-p1", "ellipsoid02-p1"
     object_name = os.path.splitext(file_name)[0]
 
     # data_processed_path = os.path.join(mgn_dataset_main_path, f"shinghei_data_{object_name}")
@@ -74,7 +74,7 @@ for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid
     with open(os.path.join(static_data_recording_path, f"{real_object_name}.pickle"), 'rb') as handle:
         static_data = pickle.load(handle)
     tri_indices = static_data["tri_indices"]
-    # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
+    partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
     
     # # if visualization:
     # #     pcds = []
@@ -83,7 +83,7 @@ for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid
     # #     open3d.visualization.draw_geometries(pcds)
         
         
-    for k in range(0,100):    # 100 grasp poses 6 p1, 7p1, 19 p1, 24 p2
+    for k in range(7,100):    # 100 grasp poses 6 p1, 7p1, 19 p1, 24 p2
         
         print(f"{object_name} - grasp {k} started. Time passed: {(timeit.default_timer() - start_time)/60:.2f}\n")
         
@@ -119,12 +119,12 @@ for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid
                 open3d.visualization.draw_geometries([mesh, pcd_full.translate((0.07,0,0))])
                 
                 break
+        
 
-
-        for i in [0,10,14,15,17,18,20,21,22,23,26,27,29,30,32,33,35,36,38,40,41,43,44,46,47,49]:
+        # for i in [0,10,14,15,17,18,20,21,22,23,26,27,29,30,32,33,35,36,38,40,41,43,44,46,47,49]:
         # for i in [0,17,20,26,29,32,33,35,36,38,40,41,43,44,46,47,49]:
-        # for i in [49]:
-        # for i in range(0,50):     # 50 time steps. Takes ~0.40 mins to process
+        for i in [0, 49]:
+        # for i in range(20,50):     # 50 time steps. Takes ~0.40 mins to process
             force = forces[i]  
             full_pc = full_pcs[i]
             print("time step, force:", i, force)
@@ -138,16 +138,9 @@ for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid
 
 
             ### Gaussian random points (outside object mesh)              
-            query_points_outside, is_inside = sample_points_gaussian_2(object_mesh, 
-                                                                        round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
+            query_points_outside, is_inside = sample_points_gaussian(object_mesh, round(num_query_pts), scales=[1.5]*3, tolerance=0.001) 
             occupancy_outside = np.zeros(num_query_pts)
             occupancy_outside[np.where(is_inside==True)[0]] = 1
-
-            # pcd_full = pcd_ize(full_pc, color=[0,0,0], vis=False)
-            # # points_surface_idx = np.where(signed_distances_noisy_points[is_inside] <= 0.0005)
-            # # pcd_test = pcd_ize(query_points_outside[is_inside][points_surface_idx], color=[0,0,0], vis=True)
-            # pcd_test = pcd_ize(query_points_outside[:2000], color=[1,0,0], vis=False)
-            # open3d.visualization.draw_geometries([pcd_full, pcd_test])
 
 
             assert query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts
@@ -178,9 +171,7 @@ for idx, file_name in enumerate(["sphere02"]):    # "ellipsoid01-p1", "ellipsoid
             # pcd_full = pcd_ize(full_pc, color=[0,0,0], vis=False)
             # pcd_query_outside = pcd_ize(query_points_outside[is_inside==False], color=[1,0,0], vis=False) 
             # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])
-
-            
-
+              
 
             # pcd_gripper = pcd_ize(data["gripper_pc"], color=[0,0,0])
             # # # pcd_queries = pcd_ize(all_query_points[np.where(all_occupancies==1)[0]], color=[0,0,0], vis=False)

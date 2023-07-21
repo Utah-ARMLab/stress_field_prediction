@@ -22,7 +22,7 @@ gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_predic
 os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/data"
-data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_2"
+data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04_2"
 os.makedirs(data_processed_path, exist_ok=True)
 
 data_point_count = len(os.listdir(data_processed_path))
@@ -111,7 +111,7 @@ for object_name in ["6polygon04"]:
                 query_points_random, signed_distances_random, \
                 outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
                                     boundary_threshold=[0.02, min(signed_distance_full_pc)], \
-                                    num_pts=round(num_query_pts*1.3), scales=[1.5]*3, vis=False, seed=None, verbose=False)  
+                                    num_pts=round(num_query_pts*2.0), scales=[1.2]*3, vis=False, seed=None, verbose=False)  
                 
                 
             outside_mesh_idxs = outside_mesh_idxs[:num_query_pts]

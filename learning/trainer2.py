@@ -44,8 +44,8 @@ def train(model, device, train_loader, optimizer, epoch):
         # num_queries = query.shape[1]
         # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
 
-        pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
-        query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
+        pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
+        query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
 
         # print(target_stress.shape, target_occupancy.shape)
         # print(pc.shape, query.shape)
@@ -72,9 +72,9 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
         # loss_stress /= 95
-        loss_occ *= 95
+        loss_occ *= 85
         
-        print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
+        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
         
         
@@ -126,8 +126,8 @@ def test(model, device, test_loader, epoch):
             # num_queries = query.shape[1]
             # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
 
-            pc = pc.view(-1, pc.shape[2], pc.shape[3])  # shape (B*8, 5, num_pts*2)
-            query = query.view(-1, query.shape[2], query.shape[3])  # shape (B*8, num_queries, 3)
+            pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
+            query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
             
             
             output = model(pc, query)
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01-p1"
     dataset = StressPredictionDataset3(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 30     

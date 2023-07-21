@@ -48,8 +48,8 @@ def train(model, device, train_loader, optimizer, epoch):
         pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
 
-        print(target_occupancy.shape)
-        print(pc.shape, query.shape)
+        # print(target_occupancy.shape)
+        # print(pc.shape, query.shape)
 
             
         optimizer.zero_grad()
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/cuboid01_2"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_2"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -178,13 +178,13 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    # dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_cuboid01"
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_cuboid01"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04_2"
+    # dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_cuboid01"
     dataset = StressPredictionDataset(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 150     
     
-    train_len = 1#round(dataset_size*0.9)
+    train_len = dataset_size#round(dataset_size*0.9)
     test_len = 1#round(dataset_size*0.1)-1
     total_len = train_len + test_len
     
@@ -217,10 +217,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 151):
+    for epoch in range(0, 301):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         
@@ -229,7 +229,7 @@ if __name__ == "__main__":
         
         train(model, device, train_loader, optimizer, epoch)
         scheduler.step()
-        test(model, device, test_loader, epoch)
+        # test(model, device, test_loader, epoch)
         
         if epoch % 1 == 0:            
             torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))

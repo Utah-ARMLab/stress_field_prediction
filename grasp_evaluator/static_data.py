@@ -365,7 +365,7 @@ class StaticDataCollection:
 
             object_height_buffer = 0.001
 
-            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
+            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
             # # print_color(f"{pose.p}")
 
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,

@@ -6,6 +6,7 @@ import trimesh
 import torch
 import open3d
 import numpy as np
+from scipy.stats import halfnorm
 
 def get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=1024, gripper_name='panda', finger_only=True):
     gripper = create_gripper(gripper_name, configuration=fingers_joint_angles, 
@@ -105,6 +106,93 @@ def sample_points_bounding_box(object, num_pts, scales=[1.5, 1.5, 1.5], seed=Non
     # Sample points within the extended box
     return np.random.uniform(extended_min_coords, extended_max_coords, size=(num_pts, 3))
 
+
+def sample_points_gaussian(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], tolerance=0.001, seed=None):
+    """ 
+    Sample points from object mesh surface. Then add to each point some half-gaussian noise (only positive).
+    tolerance: minimum signed distance of a query point to be considered to belong to the object volume.
+    """
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Get the bounding box of the mesh
+    bbox = object_mesh.bounding_box
+
+    # Get the minimum and maximum coordinates of the bounding box
+    min_coords = bbox.bounds[0]
+    max_coords = bbox.bounds[1]
+     
+
+    # Calculate the dimensions of the bounding box
+    dimensions = max_coords - min_coords
+
+    # Extend the dimensions by a factor of 'scales'
+    extended_dimensions = dimensions * np.array(scales)
+
+    # Sample epsilon and shift the surface points in the direction of the normal vectors.
+    sigma = max(extended_dimensions - dimensions) / 2
+    surface_points, faces = trimesh.sample.sample_surface_even(object_mesh, count=round(num_pts*1.5))
+    normals = object_mesh.face_normals[faces[:num_pts]]
+    dist = halfnorm(scale=sigma)
+    epsilon = dist.rvs(size=num_pts)  # distance epsilon to shift the surface points. Epsilon is sampled of a half-gaussian distribution. https://stats.stackexchange.com/questions/603768/how-do-you-sample-from-a-half-normal-distribution-in-python
+    noisy_points = surface_points[:num_pts] + epsilon[:, np.newaxis] * normals
+
+    # is_inside = None
+    # # noisy_points = surface_points[:num_pts] + (0.001 * np.ones((num_pts,1))) * normals  # constant 1mm epsilon example
+    signed_distances_noisy_points = trimesh.proximity.signed_distance(object_mesh, noisy_points)
+    is_inside = signed_distances_noisy_points >= -tolerance
+    # print(np.sum(is_inside))
+    # # print(min(signed_distances_noisy_points), max(signed_distances_noisy_points))
+    
+
+    return noisy_points, is_inside#, signed_distances_noisy_points
+
+def sample_points_gaussian_2(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], tolerance=0.001, seed=None):
+    """ 
+    Sample points from object mesh surface. Then add to each point some half-gaussian noise (only positive).
+    tolerance: minimum signed distance of a query point to be considered to belong to the object volume.
+    """
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Get the bounding box of the mesh
+    bbox = object_mesh.bounding_box
+
+    # Get the minimum and maximum coordinates of the bounding box
+    min_coords = bbox.bounds[0]
+    max_coords = bbox.bounds[1]
+     
+
+    # Calculate the dimensions of the bounding box
+    dimensions = max_coords - min_coords
+
+    # Extend the dimensions by a factor of 'scales'
+    extended_dimensions = dimensions * np.array(scales)
+
+    num_pts = num_pts // 2
+
+    # Sample epsilon and shift the surface points in the direction of the normal vectors.
+    sigma = max(extended_dimensions - dimensions) / 2
+    surface_points, faces = trimesh.sample.sample_surface_even(object_mesh, count=round(num_pts*1.5))
+    normals = object_mesh.face_normals[faces[:num_pts]]
+    dist = halfnorm(scale=sigma)
+    epsilon = dist.rvs(size=num_pts)  # distance epsilon to shift the surface points. Epsilon is sampled of a half-gaussian distribution. https://stats.stackexchange.com/questions/603768/how-do-you-sample-from-a-half-normal-distribution-in-python
+    noisy_points = surface_points[:num_pts] + epsilon[:, np.newaxis] * normals
+
+    # is_inside = None
+    # # noisy_points = surface_points[:num_pts] + (0.001 * np.ones((num_pts,1))) * normals  # constant 1mm epsilon example
+    signed_distances_noisy_points = trimesh.proximity.signed_distance(object_mesh, noisy_points)
+    is_inside = signed_distances_noisy_points >= -tolerance
+    # print(np.sum(is_inside))
+    # # print(min(signed_distances_noisy_points), max(signed_distances_noisy_points))
+    
+    sub_surface_points = surface_points[:num_pts] + tolerance * normals
+    noisy_points = np.concatenate((noisy_points, sub_surface_points), axis=0)
+    is_inside = np.concatenate((is_inside, np.full((num_pts,), False, dtype=bool)), axis=0)
+
+    return noisy_points, is_inside
 
 def sample_and_compute_signed_distance(tri_indices, full_pc, boundary_threshold, num_pts, scales, vis=False, seed=0, verbose=True):
     """ 

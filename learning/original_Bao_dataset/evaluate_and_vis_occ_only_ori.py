@@ -1,4 +1,5 @@
 import open3d
+import isaacgym
 import os
 import numpy as np
 import pickle
@@ -12,9 +13,10 @@ from utils.constants import OBJECT_NAMES
 from model_ori import StressNetSDF, StressNetOccupancyOnly
 
 
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_cuboid01"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_cuboid01"
+dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/data"
 
 start_time = timeit.default_timer() 
 visualization = False
@@ -27,13 +29,13 @@ num_query_pts = 10000
 # log_stress_visualization_max = np.log(stress_visualization_max)    
 
 grasp_idx_bounds = [0, 1]
-force_levels = np.arange(1, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
+force_levels = np.arange(1.0, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
     
 
 device = torch.device("cuda")
 model = StressNetOccupancyOnly(num_channels=5).to(device)
 # model = StressNetSDF(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/cuboid01_2/epoch 150"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_2/epoch 300"))
 model.eval()
 
 
@@ -49,7 +51,7 @@ excluded_objects = \
 # for idx, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))[0:]):
 # for idx, object_name in enumerate(["sphere04"]):
 # for idx, file_name in enumerate(sorted(os.listdir(os.path.join(mgn_dataset_main_path, "raw_tfrecord_data")))):
-for idx, file_name in enumerate(["cuboid01"]):
+for idx, file_name in enumerate(["6polygon04"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -71,11 +73,11 @@ for idx, file_name in enumerate(["cuboid01"]):
             print_color(f"{file_name} not found")
             continue
         with open(file_name, 'rb') as handle:
-            data = pickle.load(handle)
+            gripper_data = pickle.load(handle)
         
         
         ### Load robot gripper point cloud
-        gripper_pc = data["gripper_pc"]     
+        gripper_pc = gripper_data["gripper_pc"]     
         augmented_gripper_pc = np.hstack((gripper_pc, np.tile(np.array([0, 0]), 
                                         (gripper_pc.shape[0], 1)))) # shape (num_pts,5)
         augmented_gripper_pc = np.tile(augmented_gripper_pc[np.newaxis, :, :], (8, 1, 1)) # shape (8,num_pts,5)
@@ -92,18 +94,19 @@ for idx, file_name in enumerate(["cuboid01"]):
         # open3d.visualization.draw_geometries(pcds)
 
 
-        for i in range(0,50):     # 50 time steps. Takes ~0.40 mins to process
-
-            query_data = read_pickle_data(data_path=os.path.join(dataset_path, f"processed sample {i}.pickle"))  # shape (B, 3)
-            # test_stress = query_data["stress_log"]
-            test_query = query_data["query_points"]
-            # num = test_stress.shape[0]
-            # test_occ = query_data["occupancy"]          
-            test_signed_distance = query_data["signed_distance"]  
-            force = query_data["force"]  
-            young_modulus = query_data["young_modulus"] 
-            print("force:", force)
-            full_pc = test_query[np.where(test_signed_distance >= 0.000)[0]]
+        for force in force_levels:
+            
+            print(f"{object_name} - grasp {k} - force {force} started")
+            
+            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{force}.pickle")
+            
+            with open(file_name, 'rb') as handle:
+                data = pickle.load(handle)
+                
+            young_modulus = np.log(float(data["young_modulus"]))
+            full_pc = data["object_particle_state"]
+            force = data["force"]      
+            print("force:", force)      
 
             augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
                                                     (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
@@ -115,7 +118,7 @@ for idx, file_name in enumerate(["cuboid01"]):
             
             ### Get query points (sample randomly or use the ground-truth particles)
             if query_type == "sampled":
-                query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3) 
+                query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.2]*3)  # shape (num_query_pts,3) 
                 
                 # query = full_pc
                 # query = test_query
@@ -134,22 +137,22 @@ for idx, file_name in enumerate(["cuboid01"]):
             
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
             # occupied_idxs = np.where(pred_occupancy >= -0.002)[0]
-            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.9)[0]
 
             # wrong_labels = np.where((predicted_classes != test_occ)[0])
             # pcd_wrong = pcd_ize(query[wrong_labels], color=[0,1,0])
 
 
-            pcd_gt = pcd_ize(query[occupied_idxs], color=[1,0,0])
+            pcd = pcd_ize(query[occupied_idxs], color=[0,0,1])
 
-            pcd = pcd_ize(full_pc, color=[0,1,0])
+            pcd_gt = pcd_ize(full_pc, color=[1,0,0])
             
             # pcd_bad = pcd_ize(query[np.where(predicted_classes != test_occ)[0]], color=[0,0,0])
 
             # open3d.visualization.draw_geometries([pcd.translate((0.00,0,0)), pcd_gt, pcd_gripper])
             # open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_bad.translate((0.14,0,0))])
-            open3d.visualization.draw_geometries([pcd.translate((0.07,0,0)), pcd_gt, pcd_gripper])
-            
+            # open3d.visualization.draw_geometries([pcd_gt.translate((0.05,0,0)), pcd, pcd_gripper])
+            open3d.visualization.draw_geometries([pcd_gt.translate((0.00,0.00,0)), pcd])
             
             print_color("========================")
             

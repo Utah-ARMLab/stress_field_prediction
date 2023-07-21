@@ -9,7 +9,7 @@ from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
-from model import StressNetOccupancyOnly
+from model import StressNetOccupancyOnly3
 from copy import deepcopy
 
 
@@ -29,15 +29,15 @@ num_query_pts = 10000
     
 
 device = torch.device("cuda")
-model = StressNetOccupancyOnly(num_channels=5).to(device)   # run5(occ_only_p1) run4(occ_only_6polygon04)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new/ellipsoid01_test_all/epoch 600"))
+model = StressNetOccupancyOnly3(num_channels=5).to(device)   # run5(occ_only_p1) run4(occ_only_6polygon04)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new/sphere02/epoch 600"))
 model.eval()
 
 
 
 
 
-for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6polygon04"
+for idx, file_name in enumerate(["sphere02"]):    #"ellipsoid01-p1" "6polygon04"
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -45,7 +45,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
     print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins")
 
 
-    for k in range(6,100):    # 100 grasp poses
+    for k in range(0,100):    # 100 grasp poses
         
         file_name = os.path.join(filtered_data_path, f"{object_name}_grasp_{k}.pickle")        
         if not os.path.isfile(file_name):
@@ -87,12 +87,13 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
         #     pcds.append(pcd_ize(pc, color=[0,1,0]).translate((0,0.00*j,0)))
         # open3d.visualization.draw_geometries(pcds)
 
-        selected_idxs = [0,17,20,26,29,32,33,35,36,38,40,41,43,44,46,47,49]
+        selected_idxs = [0,10,14,15,17,18,20,21,22,23,26,27,29,30,32,33,35,36,38,40,41,43,44,46,47,49]
         pcds = []
         pcd_gts = []
 
-        for i in [0,len(selected_idxs)-1]:
-        # for i in range(0,25): #len(selected_idxs)
+        # for i in [0,len(selected_idxs)-1]:
+        for i in [0,25]:
+        # for i in range(0,len(selected_idxs)): #len(selected_idxs)
             
         # for i in range(49,50):     # 50 time steps. Takes ~0.40 mins to process
 
@@ -108,14 +109,15 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
 
             force = forces[i]  
             print("force:", force)
+            
+            force_tensor = torch.tensor([force]).unsqueeze(0).float().to(device)
+            
             full_pc = full_pcs[i]
 
-            augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
-                                                    (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
         
             ### Combine object pc and gripper pc
-            combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1)[0:1,:,:] # shape (8, num_pts*2, 5)
-            combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
+            combined_pcs = np.concatenate((partial_pcs[0,:,:], gripper_pc), axis=0) # shape (1, num_pts*2, 3)
+            combined_pc_tensor = torch.from_numpy(combined_pcs).permute(1,0).unsqueeze(0).float().to(device)  # shape (1, 3, num_pts*2) 
             
             
             ### Get query points (sample randomly or use the ground-truth particles)
@@ -157,20 +159,21 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
             
             query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
             query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
-            occupancy = model(combined_pc_tensor, query_tensor) # shape (8*num_queries,1)
+            print(combined_pc_tensor.shape, force_tensor.shape)
+            occupancy = model(combined_pc_tensor, force_tensor, query_tensor) # shape (8*num_queries,1)
 
-            predicted_classes = (occupancy >= 0.9).int().squeeze().cpu().detach().numpy()
+            predicted_classes = (occupancy >= 0.5).int().squeeze().cpu().detach().numpy()
             # print(predicted_classes.shape, is_inside.shape)m
             # print("Accuracy:", np.sum(predicted_classes == is_inside)/is_inside.shape[0])
 
 
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            occupied_idxs = np.where(pred_occupancy >= 0.9)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.5)[0]
             print("occupied_idxs.shape[0] / total:", occupied_idxs.shape[0], query.shape[0])
 
 
-            top_indices = np.argsort(pred_occupancy[occupied_idxs])[round(occupied_idxs.shape[0]*0.0):]
-            pcd_top = pcd_ize(query[occupied_idxs[top_indices]], color=[0,0,1], vis=False)
+            # top_indices = np.argsort(pred_occupancy[occupied_idxs])[round(occupied_idxs.shape[0]*0.0):]
+            # pcd_top = pcd_ize(query[occupied_idxs[top_indices]], color=[0,0,1], vis=False)
 
             # bad_idxs = np.where(is_inside != (pred_occupancy >= 0.5))[0]
             # pcd_bad = pcd_ize(query[bad_idxs], color=[0,1,0], vis=False)
@@ -194,7 +197,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
             # open3d.visualization.draw_geometries([deepcopy(pcd_top).translate((0.07,0,0)), pcd_gt])
 
 
-            pcds.append(pcd_top)
+            pcds.append(pcd)
             
             # print("min y max y predicted:", min(predicted_volume[:,1]), max(predicted_volume[:,1]))
             # print("min y max y gt:", min((full_pc - np.array([0,1.0,0]))[:,1]), max((full_pc - np.array([0,1.0,0]))[:,1]))
@@ -220,7 +223,7 @@ for idx, file_name in enumerate(["ellipsoid01-p1"]):    #"ellipsoid01-p1" "6poly
         for i, pcd in enumerate(pcds):
             pcd.translate((0.0,0.00*(i),0))
 
-        pcd_final = pcd_ize(full_pcs[0] - np.array([0,1.0,0]), color=[1,0,0])
+        pcd_final = pcd_ize(full_pcs[-1] - np.array([0,1.0,0]), color=[1,0,0])
         pcd_final.translate((0.07,0.00,0))
         pcds.append(pcd_final)
 
