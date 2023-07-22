@@ -7,58 +7,62 @@ import sys
 import argparse
 
 import isaacgym
-sys.path.append("../../")
+sys.path.append("../")
 from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
 
 """ 
-Process data collected by Bao
+Process data collected by Bao.
 """
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_sphere02"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
 os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/sphere02_data"
-data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_sphere02"
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon04_data"
+data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
 os.makedirs(data_processed_path, exist_ok=True)
 
 data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
 num_pts = 1024
-# num_query_pts = 4000
+num_query_pts = 2000
 
-grasp_idx_bounds = [1, 2]
-force_levels = np.arange(0.0, 15.25, 0.25)  #np.arange(1, 15.25, 0.25)    [1.0]
+grasp_idx_bounds = [2, 100]
+
 
 # for object_name in OBJECT_NAMES:
-for object_name in ["sphere02"]:
+for object_name in ["6polygon04"]:
+
+    ### Get static data
+    with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
+        static_data = pickle.load(handle)
+    tri_indices = static_data["tri_indices"]
+    tet_indices = static_data["tet_indices"]
+    # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
     for grasp_idx in range(*grasp_idx_bounds):        
         print(f"{object_name} - grasp {grasp_idx} started. Time passed: {timeit.default_timer() - start_time}")
         
         get_gripper_pc = True
         
-        for force in force_levels:
+        for force_idx in range(0,61):
             
             # print(f"{object_name} - grasp {grasp_idx} - force {force} started")
             
-            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force}.pickle")
+            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force_idx}.pickle")
             if not os.path.isfile(file_name):
                 print(f"{file_name} not found")
-                continue    #break 
+                break   #continue  
             
             with open(file_name, 'rb') as handle:
                 data = pickle.load(handle)
 
-            (tet_indices, tet_stress) = data["tet"]
-            tet_indices = np.array(tet_indices).reshape(-1,4)
-            (tri_indices, tri_parents, tri_normals) = data["tri"]
-            
-            # object_name = data["object_name"]        
+                       
+            tet_stress = data["tet_stress"]        
             young_modulus = int(float(data["young_modulus"]))
             object_particle_state = data["object_particle_state"]
             force = data["force"]
@@ -76,17 +80,11 @@ for object_name in ["sphere02"]:
                 write_pickle_data(gripper_data, save_path)
                 
                 get_gripper_pc = False
-
-           
+          
             
             if visualization:
 
-                ### Get partial point clouds
-                with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
-                    static_data = pickle.load(handle)
-                partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
-
-                pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
+                # pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
                 pcd_full = pcd_ize(object_particle_state, color=[1,0,0])
                 pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
 
@@ -94,39 +92,40 @@ for object_name in ["sphere02"]:
                 open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
 
 
-            full_pc = object_particle_state
+            full_pc = object_particle_state            
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
-            signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
-            # print("full_pc.shape:", full_pc.shape)
+            # signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
+            print("full_pc.shape:", full_pc.shape)
 
-            ### Points belongs to the object volume   
-            query_points_volume = full_pc
+
+            ### Points belongs the object volume            
+            query_points_volume = trimesh.sample.volume_mesh(object_mesh, round(num_query_pts*2))[:num_query_pts]
+            if query_points_volume.shape[0] < num_query_pts:
+                query_points_volume = trimesh.sample.volume_mesh(object_mesh, round(num_query_pts*3))[:num_query_pts]
+                
             occupancy_volume = np.ones(query_points_volume.shape[0])
-            signed_distances_volume = signed_distance_full_pc   #trimesh.proximity.signed_distance(object_mesh, query_points_volume)  
-            num_query_pts = query_points_volume.shape[0]         
+            # print("query_points_volume.shape", query_points_volume.shape)
 
-            ### Random points (both outside and inside object mesh)   
-            outside_mesh_idxs = None
-            while(outside_mesh_idxs is None or outside_mesh_idxs.shape[0] < num_query_pts):                
-                query_points_random, signed_distances_random, \
-                outside_mesh_idxs = sample_and_compute_signed_distance(tri_indices, full_pc, \
-                                    boundary_threshold=[0.02, min(signed_distance_full_pc)], \
-                                    num_pts=round(num_query_pts*2.0), scales=[1.2]*3, vis=False, seed=None, verbose=False)  
-                
-                
-            outside_mesh_idxs = outside_mesh_idxs[:num_query_pts]
-            query_points_random = query_points_random[outside_mesh_idxs]
-            occupancy_random = np.zeros(num_query_pts)
-            signed_distances_random = signed_distances_random[outside_mesh_idxs]
 
-            
-            all_query_points = np.concatenate((query_points_volume, query_points_random), axis=0)
-            all_occupancies = np.concatenate((occupancy_volume, occupancy_random), axis=0)     
-            all_signed_distances = np.concatenate((signed_distances_volume, signed_distances_random), axis=0)        
+            ### Gaussian random points (outside object mesh)              
+            query_points_outside, is_inside = sample_points_gaussian(object_mesh, round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
+            occupancy_outside = np.zeros(num_query_pts)
+            occupancy_outside[np.where(is_inside==True)[0]] = 1
+
+            if query_points_outside.shape[0] != num_query_pts or query_points_volume.shape[0] != num_query_pts:
+                print(query_points_outside.shape[0], query_points_volume.shape[0])
+
+            assert query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts
+                                       
+
+
+            all_query_points = np.concatenate((query_points_volume, query_points_outside), axis=0)
+            all_query_points[..., 1] -= 1.0    # shift back to (0,0,0) origin
+            all_occupancies = np.concatenate((occupancy_volume, occupancy_outside), axis=0)    
             
             
             processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
-                            "signed_distance": all_signed_distances, "force": force, 
+                            "force": force, 
                             "young_modulus": np.log(young_modulus), 
                             "object_name": object_name, "grasp_idx": grasp_idx}
                                         

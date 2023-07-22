@@ -893,7 +893,11 @@ class PandaFsm:
             self.mg = 9.81 * object_volume * self.density
             # self.desired_force = self.FOS * 9.81 \
             #     * object_volume * self.density / self.object_cof    * 100
-            self.desired_force = 14#1.0
+            self.desired_force = 16.0#1.0
+            self.curr_recording_force = 0.0
+            self.max_force_allowed = 16.0
+            self.recorded_force_count = 0
+
             # self.FOS /= 100
 
 
@@ -1089,9 +1093,12 @@ class PandaFsm:
             force_too_high = False
             if np.log10(self.youngs) > 9 and f_avg_of_filter > 50:
                 force_too_high = True
-            elif np.log10(self.youngs) <= 9 and (f_avg_of_filter > 4 * self.desired_force) \
-                    and f_avg_of_filter > 10:
-                force_too_high = True
+            # elif np.log10(self.youngs) <= 9 and (f_avg_of_filter > 4 * self.desired_force) \
+            #         and f_avg_of_filter > 10:
+            #     force_too_high = True
+
+            elif f_avg_of_filter > self.max_force_allowed:
+                force_too_high = True            
             if force_too_high:
                 print("Squeezing force too high, reset")
                 self.state = "done"
@@ -1156,9 +1163,9 @@ class PandaFsm:
                 self.inferred_rot_force_counter > 30)
 
 
-            # # print("============= F_des, F_curr, F_err, self.f_errs:", F_des, F_curr, F_err, self.f_errs, np.all(np.abs(self.f_errs) < 0.05 * self.desired_force))
-            # print("\n")
-            print("============= F_des, F_curr, np.abs(F_des-F_curr):", F_des, F_curr, np.abs(F_des-F_curr), np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2)
+            # # # print("============= F_des, F_curr, F_err, self.f_errs:", F_des, F_curr, F_err, self.f_errs, np.all(np.abs(self.f_errs) < 0.05 * self.desired_force))
+            # # print("\n")
+            # print("============= F_des, F_curr, np.abs(F_des-F_curr):", F_des, F_curr, np.abs(F_des-F_curr), np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2)
 
             # If desired squeezing forces is met
             # if np.all(
@@ -1172,25 +1179,28 @@ class PandaFsm:
             #         np.abs(F_des-F_curr) < 0.05 * self.desired_force / 2
             # ) and not self.squeezed_until_force and squeeze_guard and np.all(
             #         particles_contacting_gripper > 0):
-            if np.all(
-                    np.abs(self.f_errs) < 0.05 * self.desired_force
-            ) and not self.squeezed_until_force and squeeze_guard and np.all(
-                    particles_contacting_gripper > 0):
-            
-                print(f"\n xxxxxx success {self.desired_force}N \n") 
+            print("self.f_moving_average[-1]:", self.f_moving_average[-1])
+            # if np.all(
+            #         np.abs(self.f_errs) < 0.05 * self.desired_force
+            # ) and not self.squeezed_until_force and squeeze_guard and np.all(
+            #         particles_contacting_gripper > 0):
 
-                # if self.cfg['data_recording']['is_recording']:
-                #     data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.desired_force}.pickle")
-                #     record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
-                #                                 self.desired_force, self.grasp_pose, 
-                #                                 self.pre_squeeze_fingers_joint_angles,
-                #                                 self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
+            if self.state != "done" and self.f_moving_average[-1] >= self.curr_recording_force:
 
+                print_color(f"\n xxxxxx success {self.curr_recording_force}N \n") 
 
-                # self.desired_force += 0.25
+                if self.cfg['data_recording']['is_recording']:
+                    data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.recorded_force_count}.pickle")
+                    record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
+                                                self.f_moving_average[-1], self.grasp_pose, 
+                                                self.pre_squeeze_fingers_joint_angles,
+                                                self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
+                    self.recorded_force_count += 1
+
+                self.curr_recording_force += 0.25
                 
-                # if self.desired_force > 15:
-                #     self.state = "done"
+                if self.curr_recording_force > 15:
+                    self.state = "done"
                               
 
                 # if self.mode == "reorient":

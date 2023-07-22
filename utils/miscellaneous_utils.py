@@ -81,15 +81,18 @@ def get_object_particle_state(gym, sim, vis=False):
 #     object_particle_position = get_object_particle_state(gym, sim)
 
 def record_data_stress_prediction(data_recording_path, gym, sim, 
-                                current_desired_force, grasp_pose, fingers_joint_angles, 
+                                current_force, grasp_pose, fingers_joint_angles, 
                                 object_name, young_modulus, object_scale):
                                     
     ### Get current object particle state:
     object_particle_state = get_object_particle_state(gym, sim)
+
+    (tet_indices, tet_stress) = gym.get_sim_tetrahedra(sim)
+
        
-    data = {"object_particle_state": object_particle_state, "force": current_desired_force, 
+    data = {"object_particle_state": object_particle_state, "force": current_force, 
         "grasp_pose": grasp_pose, "fingers_joint_angles": fingers_joint_angles, 
-        "tet": gym.get_sim_tetrahedra(sim), "tri": gym.get_sim_triangles(sim), 
+        "tet_stress": tet_stress, 
         "object_name": object_name, "young_modulus": young_modulus, "object_scale": object_scale}    
     
     with open(data_recording_path, 'wb') as handle:

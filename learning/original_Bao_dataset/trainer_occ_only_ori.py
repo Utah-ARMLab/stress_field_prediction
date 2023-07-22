@@ -165,7 +165,7 @@ if __name__ == "__main__":
     torch.manual_seed(2021)
     device = torch.device("cuda")
 
-    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_2"
+    weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/sphere02"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04_2"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_sphere02"
     # dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_cuboid01"
     dataset = StressPredictionDataset(dataset_path)
     dataset_size = len(os.listdir(dataset_path))
@@ -217,10 +217,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 200, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 301):
+    for epoch in range(0, 601):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

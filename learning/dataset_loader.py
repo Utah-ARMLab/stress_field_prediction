@@ -65,12 +65,15 @@ class StressPredictionDataset2(Dataset):
     
 class StressPredictionDataset3(Dataset):
 
-    def __init__(self, dataset_path):
+    def __init__(self, dataset_path, gripper_pc_path, object_partial_pc_path):
         self.dataset_path = dataset_path
         self.filenames = os.listdir(self.dataset_path)
-        self.gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/filtered_data"
-        self.object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data" 
-            
+        # self.gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/filtered_data"
+        # self.object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data" 
+        self.gripper_pc_path = gripper_pc_path
+        self.object_partial_pc_path = object_partial_pc_path        
+
+
     def load_pickle_data(self, filename):
         # if os.path.getsize(os.path.join(self.dataset_path, filename)) == 0: 
         #     print(filename)

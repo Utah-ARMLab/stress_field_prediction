@@ -73,6 +73,7 @@ class GraspEvaluator:
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
+        # print_color(self.data_recording_path)
         os.makedirs(self.data_recording_path, exist_ok=True)
         
         self.object_path = os.path.join(self.assets_dir, self.object_name)
@@ -131,14 +132,14 @@ class GraspEvaluator:
         grasp_file_name = self.object_name + "_grasps.h5"
         f = h5py.File(os.path.join(self.object_path, grasp_file_name), 'r')
         self.grasp_candidate_poses = f['poses'][self.grasp_ind:self.grasp_ind + 1]
-        self.num_grasp_poses = f['poses'].shape[0]
-        print("========== Number of total grasp candidates", self.num_grasp_poses)
+        # self.num_grasp_poses = f['poses'].shape[0]
+        # print("========== Number of total grasp candidates", self.num_grasp_poses)
        
 
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
         
         self.object_scale = 1#f['object_scale'][()]
-        print("Object scale:", self.object_scale )
+        # print("Object scale:", self.object_scale )
         
         f.close() 
 
@@ -162,17 +163,17 @@ class GraspEvaluator:
         sim_params.stress_visualization_max = 5e3   #1e5
 
         # Set FleX-specific parameters
-        # sim_params.flex.solver_type = 5
-        # sim_params.flex.num_outer_iterations = 10
-        # sim_params.flex.num_inner_iterations = 200
-        # sim_params.flex.relaxation = 0.75
-        # sim_params.flex.warm_start = 0.8
-
         sim_params.flex.solver_type = 5
-        sim_params.flex.num_outer_iterations = 4
-        sim_params.flex.num_inner_iterations = 50
+        sim_params.flex.num_outer_iterations = 10
+        sim_params.flex.num_inner_iterations = 200
         sim_params.flex.relaxation = 0.75
         sim_params.flex.warm_start = 0.8
+
+        # sim_params.flex.solver_type = 5
+        # sim_params.flex.num_outer_iterations = 4
+        # sim_params.flex.num_inner_iterations = 50
+        # sim_params.flex.relaxation = 0.75
+        # sim_params.flex.warm_start = 0.8
 
         sim_params.flex.deterministic_mode = True
 
@@ -257,10 +258,10 @@ class GraspEvaluator:
             camera_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])            
             self.gym.viewer_camera_look_at(self.viewer, None, camera_pos, camera_target)
 
-        """ Camera for getting point cloud. """
-        self.pc_cam_props = gymapi.CameraProperties()    
-        self.pc_cam_props.width = 1000  #256
-        self.pc_cam_props.height = 1000 #256
+        # """ Camera for getting point cloud. """
+        # self.pc_cam_props = gymapi.CameraProperties()    
+        # self.pc_cam_props.width = 1000  #256
+        # self.pc_cam_props.height = 1000 #256
 
         # pc_cam_position = gymapi.Vec3(-0.1, 0.1, self.cfg['sim_params']['platform_height'] + 0.02 + 0.1)
         # pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
@@ -557,7 +558,7 @@ class GraspEvaluator:
             self.gym.destroy_viewer(self.viewer)
         self.gym.destroy_sim(self.sim)
 
-        print("Finished the simulation", timeit.default_timer() - loop_start)
+        print_color(f"Finished the simulation: {timeit.default_timer() - loop_start}")
 
  
         return

@@ -13,7 +13,7 @@ class StressPredictionDataset(Dataset):
     def __init__(self, dataset_path):
         self.dataset_path = dataset_path
         self.filenames = os.listdir(self.dataset_path)
-        self.gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
+        self.gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_sphere02"
         self.object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
         # self.gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/filtered_data"
         # self.object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data" 

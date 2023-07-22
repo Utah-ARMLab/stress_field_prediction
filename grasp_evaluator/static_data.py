@@ -365,7 +365,7 @@ class StaticDataCollection:
 
             object_height_buffer = 0.001
 
-            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
+            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
             # # print_color(f"{pose.p}")
 
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,
@@ -427,9 +427,12 @@ class StaticDataCollection:
 
                 (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
                 tri_indices = np.array(tri_indices).reshape(-1,3)
-                # print(tri_indices.shape)
+                
+                (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)
+                tet_indices = np.array(tet_indices).reshape(-1,4)
+                # print(tri_indices.shape, tet_indices.shape)
 
-                data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices}
+                data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 

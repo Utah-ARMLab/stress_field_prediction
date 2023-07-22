@@ -10,7 +10,7 @@ from scipy.stats import halfnorm
 
 def get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=1024, gripper_name='panda', finger_only=True):
     gripper = create_gripper(gripper_name, configuration=fingers_joint_angles, 
-                             franka_gripper_mesh_main_path="../../graspsampling-py-defgraspsim", finger_only=finger_only)
+                             franka_gripper_mesh_main_path="../graspsampling-py-defgraspsim", finger_only=finger_only)
     transformation_matrix = poses_wxyz_to_mats(grasp_pose)[0]
     mesh = gripper.mesh.copy()
     mesh.apply_transform(transformation_matrix)

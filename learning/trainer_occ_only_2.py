@@ -148,7 +148,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new/ellipsoid01_test_all"
+        "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -161,12 +161,15 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/ellipsoid01_test_all"
-    dataset = StressPredictionDataset3(dataset_path)
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
+    object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
+
+    dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 150     
     
-    train_len = dataset_size    #round(dataset_size*0.9)
+    train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)-1
     total_len = train_len + test_len
     
@@ -195,10 +198,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 200, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 601):
+    for epoch in range(0, 151):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         
@@ -207,7 +210,7 @@ if __name__ == "__main__":
         
         train(model, device, train_loader, optimizer, epoch)
         scheduler.step()
-        # test(model, device, test_loader, epoch)
+        test(model, device, test_loader, epoch)
         
         if epoch % 1 == 0:            
             torch.save(model.state_dict(), os.path.join(weight_path, "epoch " + str(epoch)))

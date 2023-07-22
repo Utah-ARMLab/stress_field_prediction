@@ -10,13 +10,13 @@ from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
-from model_ori import StressNetSDF, StressNetOccupancyOnly
+from model import StressNetOccupancyOnly
 
 
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_sphere02"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_sphere02"
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/sphere02_data"
+dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon04_data"
 
 start_time = timeit.default_timer() 
 visualization = False
@@ -28,14 +28,14 @@ num_query_pts = 20000
 # log_stress_visualization_min = np.log(stress_visualization_min)   
 # log_stress_visualization_max = np.log(stress_visualization_max)    
 
-grasp_idx_bounds = [1, 2]
+grasp_idx_bounds = [0, 1]
 # force_levels = np.arange(0.0, 15.25, 2.0)  #np.arange(1, 15.25, 0.25)    [1.0]
-force_levels = [0.0,3.0,8.0,11.25]   
+# force_levels = [0.0,3.0,8.0,11.25]   
 
 device = torch.device("cuda")
 model = StressNetOccupancyOnly(num_channels=5).to(device)
 # model = StressNetSDF(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/sphere02/epoch 600"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04/epoch 151"))
 model.eval()
 
 
@@ -48,7 +48,7 @@ excluded_objects = \
 [f"cylinder0{i}" for i in [1,2,3]] + [f"sphere0{i}" for i in [1,3]]
 
 
-for idx, file_name in enumerate(["sphere02"]):
+for idx, file_name in enumerate(["6polygon04"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -85,7 +85,7 @@ for idx, file_name in enumerate(["sphere02"]):
         # open3d.visualization.draw_geometries(pcds)
 
 
-        file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{0.0}.pickle")        
+        file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{0}.pickle")        
         with open(file_name, 'rb') as handle:
             data = pickle.load(handle)
             query = sample_points_bounding_box(trimesh.PointCloud(data["object_particle_state"]), num_query_pts, scales=[1.5,1.5,1.5])  # shape (num_query_pts,3) 
@@ -95,11 +95,11 @@ for idx, file_name in enumerate(["sphere02"]):
         pcds = []
         pcd_gts = []
 
-        for force in force_levels:
+        for force_idx in range(0,61):
             
-            print(f"{object_name} - grasp {k} - force {force} started")
+            # print(f"{object_name} - grasp {k} - force {force_idx} started")
             
-            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{force}.pickle")
+            file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{force_idx}.pickle")
 
             if not os.path.isfile(file_name):
                 print(f"{file_name} not found")
