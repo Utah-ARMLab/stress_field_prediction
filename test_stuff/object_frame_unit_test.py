@@ -7,6 +7,7 @@ import os
 import pickle
 import open3d
 from copy import deepcopy
+import timeit
 
 def is_homogeneous_matrix(matrix):
     # Check matrix shape
@@ -74,10 +75,11 @@ def homogeneous_transform_to_object_frame(points):
     # print(z_axis)
     
     if z_axis[2] < 0:
-        if x_axis[0] < 0:
-            x_axis *= -1
-        else:
-            y_axis *= -1
+        # if x_axis[0] < 0:
+        #     x_axis *= -1
+        # else:
+        #     y_axis *= -1
+        x_axis *= -1
         z_axis *= -1
         
 
@@ -107,6 +109,20 @@ def transform_point_cloud(point_cloud, transformation_matrix):
 
     return transformed_points
 
+def transform_point_clouds_vectorized(point_clouds_list, transformation_matrices_list):
+    # Convert the point clouds to homogeneous coordinates (add 1 as the fourth component)
+    point_clouds_homogeneous = [np.hstack((pc, np.ones((pc.shape[0], 1)))) for pc in point_clouds_list]
+
+    # Stack all transformation matrices into a single 3D array
+    transformation_matrices = np.stack(transformation_matrices_list)
+
+    # Perform matrix multiplication to transform all point clouds at once
+    transformed_point_clouds_homogeneous = np.matmul(point_clouds_homogeneous, transformation_matrices.transpose(0, 2, 1))
+
+    # Convert the transformed point clouds back to Cartesian coordinates
+    transformed_point_clouds = [tpc[:, :3] for tpc in transformed_point_clouds_homogeneous]
+
+    return transformed_point_clouds
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"  # _original
 
@@ -131,11 +147,27 @@ for i in range(8):
 
     pcd = pcd_ize(pc, color=[0,0,0])
     pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
-    # open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
+    open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
     
     coor_objects.append(coor_object)
     
-open3d.visualization.draw_geometries(coor_objects) 
-    
+# open3d.visualization.draw_geometries(coor_objects) 
     
 
+# test_pc = np.random.uniform(size=(4000,3))
+# transformed_pcs_1 = []
+
+# start_time = timeit.default_timer()
+# for _ in range(8):
+#     transform_point_cloud(test_pc, homo_mat)
+#     # transformed_pcs_1.append(transform_point_cloud(test_pc, homo_mat))
+# # transformed_pcs_1 = np.concatenate(tuple(transformed_pcs_1), axis=0)
+# # print("transformed_pcs_1.shape:", transformed_pcs_1.shape)
+
+# print("Method 1 computation time: ", timeit.default_timer() - start_time)
+
+# test_pcs = np.random.uniform(size=(8,4000,3))
+# homo_mats = [homo_mat] * 8
+# start_time = timeit.default_timer()
+# transform_point_clouds_vectorized(test_pcs, homo_mats)
+# print("Method 2 computation time: ", timeit.default_timer() - start_time)

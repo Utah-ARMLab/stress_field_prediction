@@ -25,7 +25,7 @@ selected_primitive_names = ["6polygon", "8polygon", "cuboid", "cylinder", "spher
 
 # for i, object_name in enumerate(sorted(os.listdir(dgn_dataset_path))):
 # for i, object_name in enumerate([f"sphere0{j}" for j in [2]]):
-for i, object_name in enumerate([f"6polygon0{j}" for j in [3,5,6,7,8]]):
+for i, object_name in enumerate([f"6polygon0{j}" for j in [4]]):
     # if "annulus" in object_name[:7]:
     #     continue
     if not any([prim_name in object_name for prim_name in selected_primitive_names]):   # if object does NOT belong to any of the selected primitives.

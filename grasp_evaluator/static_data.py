@@ -34,6 +34,7 @@ from utils import uniform_sphere
 from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, down_sampling
 from utils.camera_utils import *
+from utils.point_cloud_utils import homogeneous_transform_to_object_frame, transform_point_cloud
 from isaacgym import gymtorch
 import pickle
 
@@ -431,8 +432,19 @@ class StaticDataCollection:
                 (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)
                 tet_indices = np.array(tet_indices).reshape(-1,4)
                 # print(tri_indices.shape, tet_indices.shape)
+                
+                homo_mats = []
+                for pc in partial_pcs:
+                    homo_mats.append(homogeneous_transform_to_object_frame(pc))
 
-                data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices}
+                transformed_partial_pcs = []
+                for i in range(8):
+                    transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
+                transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0)     
+                print(transformed_partial_pcs.shape)           
+
+                data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
+                        "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 

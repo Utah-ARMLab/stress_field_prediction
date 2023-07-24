@@ -11,6 +11,7 @@ sys.path.append("../")
 from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_mesh, print_color
 from utils.stress_utils import *
+from utils.point_cloud_utils import transform_point_cloud
 from utils.constants import OBJECT_NAMES
 
 """ 
@@ -28,25 +29,29 @@ data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
+process_gripper_only = True
 num_pts = 1024
 num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
+for object_name in [f"6polygon0{j}" for j in [4]]:
 
-    data_processed_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_{object_name}"
-    os.makedirs(data_processed_path, exist_ok=True)
+    if not process_gripper_only:
+        data_processed_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_{object_name}"
+        os.makedirs(data_processed_path, exist_ok=True)
+        data_point_count = len(os.listdir(data_processed_path))
     gripper_pc_recording_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_{object_name}"
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
-    data_point_count = len(os.listdir(data_processed_path))
+    
 
     ### Get static data
     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
         static_data = pickle.load(handle)
     tri_indices = static_data["tri_indices"]
     tet_indices = static_data["tet_indices"]
+    homo_mats = static_data["homo_mats"]
     # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
     for grasp_idx in range(*grasp_idx_bounds):        
@@ -80,12 +85,20 @@ for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
                 
             if get_gripper_pc:
                 gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
-                gripper_data = {"gripper_pc": gripper_pc}
+                transformed_gripper_pcs = []
+                for i in range(8):
+                    transformed_gripper_pcs.append(transform_point_cloud(gripper_pc, homo_mats[i])[np.newaxis, :]) 
+                transformed_gripper_pcs = np.concatenate(tuple(transformed_gripper_pcs), axis=0)     
+                print(transformed_gripper_pcs.shape)  
+
+                gripper_data = {"gripper_pc": gripper_pc, "transformed_gripper_pcs": transformed_gripper_pcs}
                 save_path = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{grasp_idx}.pickle")
                 write_pickle_data(gripper_data, save_path)
                 
                 get_gripper_pc = False
-          
+            
+            if process_gripper_only:
+                break
             
             if visualization:
 
