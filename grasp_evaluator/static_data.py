@@ -35,6 +35,7 @@ from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, down_sampling
 from utils.camera_utils import *
 from utils.point_cloud_utils import homogeneous_transform_to_object_frame, transform_point_cloud
+from utils.stress_utils import get_adjacent_tetrahedrals_of_vertex
 from isaacgym import gymtorch
 import pickle
 
@@ -441,10 +442,14 @@ class StaticDataCollection:
                 for i in range(8):
                     transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
                 transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0)     
-                print(transformed_partial_pcs.shape)           
+                # print(transformed_partial_pcs.shape)       
+
+
+                adjacent_tetrahedral_dict = get_adjacent_tetrahedrals_of_vertex(tet_indices)    
 
                 data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
-                        "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs}
+                        "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
+                        "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict}
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 

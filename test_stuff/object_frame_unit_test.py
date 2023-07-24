@@ -31,37 +31,6 @@ def is_homogeneous_matrix(matrix):
 
     return True
 
-# def homogeneous_transform_to_object_frame(points):
-#     # Step 1: Calculate the centroid of the points
-#     centroid = np.mean(points, axis=0)
-
-#     # Step 2: Use PCA to find the dominant axis (x-axis)
-#     pca = PCA(n_components=1)
-#     pca.fit(points)
-#     x_axis = pca.components_.flatten()
-#     x_axis = np.round(x_axis, decimals=2)
-#     x_axis /= np.linalg.norm(x_axis)
-    
-
-#     # Step 3: Calculate the y-axis using the cross product of x and z axes
-#     z_axis = np.array([0., 0., 1.])
-#     # y_axis = np.cross(z_axis, x_axis) 
-#     # y_axis /= np.linalg.norm(y_axis)
-#     y_axis = np.array([z_axis[1]*x_axis[2] - z_axis[2]*x_axis[1],
-#                        -(z_axis[0]*x_axis[2] - z_axis[2]*x_axis[0]),
-#                        z_axis[0]*x_axis[1] - z_axis[1]*x_axis[0]])
-#     print(np.linalg.norm(y_axis))
-
-#     # Step 4: Create the transformation matrix
-#     rotation_matrix = np.column_stack((x_axis, y_axis, z_axis))
-#     translation_vector = centroid
-
-#     # Combine rotation and translation into a 4x4 homogeneous transformation matrix
-#     transformation_matrix = np.eye(4)
-#     transformation_matrix[:3, :3] = rotation_matrix
-#     transformation_matrix[:3, 3] = translation_vector
-
-#     return transformation_matrix
 
 def homogeneous_transform_to_object_frame(points):
     
@@ -96,6 +65,16 @@ def homogeneous_transform_to_object_frame(points):
 
     return transformation_matrix
 
+def homogeneous_transform_to_object_frame_2(points):
+    
+    max_x, min_x = max(points[:,0]), min(points[:,0])
+    max_y, min_y = max(points[:,1]), min(points[:,1])
+    max_z, min_z = max(points[:,2]), min(points[:,2])
+    
+    transformation_matrix = np.eye(4)
+    transformation_matrix[:3, 3] = np.array([max_x+min_x, max_y+min_y, max_z+min_z])/2.
+
+    return transformation_matrix
 
 def transform_point_cloud(point_cloud, transformation_matrix):
     # Add homogeneous coordinate (4th component) of 1 to each point
@@ -109,20 +88,12 @@ def transform_point_cloud(point_cloud, transformation_matrix):
 
     return transformed_points
 
-def transform_point_clouds_vectorized(point_clouds_list, transformation_matrices_list):
-    # Convert the point clouds to homogeneous coordinates (add 1 as the fourth component)
-    point_clouds_homogeneous = [np.hstack((pc, np.ones((pc.shape[0], 1)))) for pc in point_clouds_list]
-
-    # Stack all transformation matrices into a single 3D array
-    transformation_matrices = np.stack(transformation_matrices_list)
-
-    # Perform matrix multiplication to transform all point clouds at once
-    transformed_point_clouds_homogeneous = np.matmul(point_clouds_homogeneous, transformation_matrices.transpose(0, 2, 1))
-
-    # Convert the transformed point clouds back to Cartesian coordinates
-    transformed_point_clouds = [tpc[:, :3] for tpc in transformed_point_clouds_homogeneous]
-
-    return transformed_point_clouds
+def get_center_point(points):
+    max_x, min_x = max(points[:,0]), min(points[:,0])
+    max_y, min_y = max(points[:,1]), min(points[:,1])
+    max_z, min_z = max(points[:,2]), min(points[:,2])  
+    
+    return np.array([max_x+min_x, max_y+min_y, max_z+min_z])/2.  
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"  # _original
 
@@ -134,22 +105,31 @@ partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
 coor_objects = []
 
-for i in range(8):
+for i in range(1):
     print(f"View {i}")
-    pc = partial_pcs[i]
-    coor_global = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
+    pc = partial_pcs[i] + np.array([0.2,0,0])
+    coor_global = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.04)
 
-    homo_mat = homogeneous_transform_to_object_frame(pc)
-    coor_object = deepcopy(coor_global).transform(homo_mat)
+    homo_mat = homogeneous_transform_to_object_frame_2(pc)
+    # print(homo_mat)
+    coor_object = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
+    coor_object.transform(homo_mat)
     pc_transformed = transform_point_cloud(pc, homo_mat)
+    
+    print(get_center_point(pc))
+    print(get_center_point(pc_transformed))
+    
+    
     # print(homo_mat)
 
 
     pcd = pcd_ize(pc, color=[0,0,0])
     pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
     open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
+    # # open3d.visualization.draw_geometries([coor_global, coor_object, pcd])
+    # # open3d.visualization.draw_geometries([pcd, coor_object])
     
-    coor_objects.append(coor_object)
+    # coor_objects.append(coor_object)
     
 # open3d.visualization.draw_geometries(coor_objects) 
     

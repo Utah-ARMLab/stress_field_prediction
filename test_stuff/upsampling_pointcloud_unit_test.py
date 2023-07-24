@@ -51,7 +51,7 @@ def compute_weighted_average(vertices, weights):
 
 def sample_points_from_mesh(mesh, k):
     num_tetrahedra = mesh.shape[0]
-    vertices = mesh.reshape(num_tetrahedra, 4, 3)
+    vertices = mesh.reshape(num_tetrahedra, 4, -1)
 
     points = []
 
@@ -134,23 +134,28 @@ for object_name in ["6polygon04"]:
             pcd = pcd_ize(full_pc, color=[0,0,0])
             
             start_time = timeit.default_timer()
-            full_pc_upsampled = sample_points_from_mesh(full_pc[tet_indices], k = 2)
-            # # full_pc_upsampled = down_sampling(full_pc_upsampled, num_pts=2000)
-            # # full_pc_upsampled = np.concatenate((full_pc, full_pc_upsampled[:2000-full_pc.shape[0]]))
-            # selected_idxs = np.random.choice(full_pc_upsampled.shape[0], size=4000-full_pc.shape[0], replace=False)
-            # full_pc_upsampled = np.concatenate((full_pc, full_pc_upsampled[selected_idxs]))
+            # full_pc_upsampled = sample_points_from_mesh(full_pc[tet_indices], k = 2)
+            # # # full_pc_upsampled = down_sampling(full_pc_upsampled, num_pts=2000)
+            # # # full_pc_upsampled = np.concatenate((full_pc, full_pc_upsampled[:2000-full_pc.shape[0]]))
+            # # selected_idxs = np.random.choice(full_pc_upsampled.shape[0], size=4000-full_pc.shape[0], replace=False)
+            # # full_pc_upsampled = np.concatenate((full_pc, full_pc_upsampled[selected_idxs]))
                                 
             
-            print("Method 1 time: ", timeit.default_timer() - start_time)
+            # print("Method 1 time: ", timeit.default_timer() - start_time)
 
-            object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
-            start_time = timeit.default_timer()          
-            query_points_volume = trimesh.sample.volume_mesh(object_mesh, 2000)
-            print("Method 2 time: ", timeit.default_timer() - start_time)
+            # object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
+            # start_time = timeit.default_timer()          
+            # query_points_volume = trimesh.sample.volume_mesh(object_mesh, 2000)
+            # print("Method 2 time: ", timeit.default_timer() - start_time)
             
             
-            print(full_pc.shape, full_pc_upsampled.shape)
-            pcd_upsampled = pcd_ize(full_pc_upsampled.reshape(-1,3), color=[1,0,0])
+            # print(full_pc.shape, full_pc_upsampled.shape)
+            # pcd_upsampled = pcd_ize(full_pc_upsampled.reshape(-1,3), color=[1,0,0])
             
             
-            open3d.visualization.draw_geometries([pcd, pcd_upsampled.translate((0.08,0,0))]) 
+            # open3d.visualization.draw_geometries([pcd, pcd_upsampled.translate((0.08,0,0))]) 
+            
+            test_pc = np.random.uniform(size=(6000,6))
+            test_sampled = sample_points_from_mesh(test_pc[tet_indices], k = 1)
+            print(test_sampled.shape)
+            
