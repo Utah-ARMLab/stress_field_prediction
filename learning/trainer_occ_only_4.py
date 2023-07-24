@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
 from model import StressNetOccupancyOnly
-from dataset_loader import StressPredictionDataset3
+from dataset_loader import StressPredictionDataset6
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_8pc"
+        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/weights/run1"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -161,13 +161,16 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
-    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
+    object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]
 
-    dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
-    dataset_size = len(os.listdir(dataset_path))
-    batch_size = 50     
+    # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
+    dataset = StressPredictionDataset6(dataset_path, gripper_pc_path, object_partial_pc_path, object_names)
+    dataset_size = len(dataset) #len(os.listdir(dataset_path))
+    print("Dataset size: ", dataset_size)
+    batch_size = 150     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)-1
@@ -198,10 +201,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 301):
+    for epoch in range(0, 151):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

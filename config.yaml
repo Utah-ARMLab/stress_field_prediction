@@ -1,6 +1,6 @@
 
 
-use_viewer: False
+use_viewer: True
 replace_existing_results: False
 write_results: True
 
@@ -23,7 +23,7 @@ dir:
 
 data_recording:
   is_recording: True
-  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/6polygon04_data'
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_6polygon_data'
 
 miscellaneous:
   force_debug: False
@@ -37,7 +37,7 @@ franka:
 
 timeout:
   squeeze_no_gravity: 1000
-  other_modes: 600  #700
+  other_modes: 400  #600  #700
 
 lp_filter:
   running_window_size: 50

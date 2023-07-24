@@ -9,7 +9,7 @@ import argparse
 import isaacgym
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_mesh, print_color
+from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data
 from utils.stress_utils import *
 from utils.constants import OBJECT_NAMES
 
@@ -18,29 +18,24 @@ Process data collected by Bao.
 """
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-# gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
-# os.makedirs(gripper_pc_recording_path, exist_ok=True)
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
+os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/all_6polygon_data"
-# data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
-# os.makedirs(data_processed_path, exist_ok=True)
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon04_data"
+data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
+os.makedirs(data_processed_path, exist_ok=True)
 
-# data_point_count = len(os.listdir(data_processed_path))
+data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
 num_pts = 1024
-num_query_pts = 2000
+# num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
-
-    data_processed_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_{object_name}"
-    os.makedirs(data_processed_path, exist_ok=True)
-    gripper_pc_recording_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_{object_name}"
-    os.makedirs(gripper_pc_recording_path, exist_ok=True)
-    data_point_count = len(os.listdir(data_processed_path))
+# for object_name in OBJECT_NAMES:
+for object_name in ["6polygon04"]:
 
     ### Get static data
     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
@@ -60,7 +55,7 @@ for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
             
             file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force_idx}.pickle")
             if not os.path.isfile(file_name):
-                # print_color(f"{file_name} not found")
+                print(f"{file_name} not found")
                 break   #continue  
             
             with open(file_name, 'rb') as handle:
@@ -99,31 +94,23 @@ for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
 
             full_pc = object_particle_state            
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
+            # signed_distance_full_pc = trimesh.proximity.signed_distance(object_mesh, full_pc)
             # print("full_pc.shape:", full_pc.shape)
 
 
-            ### Points belongs the object volume   
-            if num_query_pts > full_pc.shape[0]:                  
-                num_pts_each_tetrahedron = int(np.ceil((num_query_pts-full_pc.shape[0]) / tet_indices.shape[0]))   
-                points_from_tet_mesh = sample_points_from_mesh(full_pc[tet_indices], k=num_pts_each_tetrahedron)
-                selected_idxs = np.random.choice(points_from_tet_mesh.shape[0], size=num_query_pts-full_pc.shape[0], replace=False) # only select a few points sampled from the tet mesh.
-                query_points_volume = np.concatenate((full_pc, points_from_tet_mesh[selected_idxs])) # concat the object particles with these newly selected points.
-                # print("num_pts_each_tetrahedron:", num_pts_each_tetrahedron) 
-                
-                
-            else:
-                query_points_volume = full_pc[:num_query_pts]
-            
+            ### Points belongs the object volume            
+            query_points_volume = full_pc
             occupancy_volume = np.ones(query_points_volume.shape[0])
-            # print("query_points_volume.shape", query_points_volume.shape)
-            # pcd_ize(query_points_volume, color=[0,0,0], vis=True)
-
+            num_query_pts = query_points_volume.shape[0]    
 
 
             ### Gaussian random points (outside object mesh)              
             query_points_outside, is_inside = sample_points_gaussian(object_mesh, round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
             occupancy_outside = np.zeros(num_query_pts)
             occupancy_outside[np.where(is_inside==True)[0]] = 1
+
+            # if query_points_outside.shape[0] != num_query_pts or query_points_volume.shape[0] != num_query_pts:
+            #     print(query_points_outside.shape[0], query_points_volume.shape[0])
 
             assert query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts
                                        
@@ -141,19 +128,11 @@ for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
 
             with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
                 pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
-
-            data_point_count += 1
-
-
-            # pcd_query_inside = pcd_ize(query_points_volume, color=[0,1,0], vis=False) 
-            # pcd_full = pcd_ize(full_pc, color=[0,0,0], vis=False)
-            # pcd_query_outside = pcd_ize(query_points_outside[is_inside==False], color=[1,0,0], vis=False) 
-            # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])
-
                 
+            data_point_count += 1    
 
 
-        #     break
+            # break
         # break
         
         

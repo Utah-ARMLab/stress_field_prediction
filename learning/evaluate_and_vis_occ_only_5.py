@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import timeit
 import sys
-sys.path.append("../../")
+sys.path.append("../")
 from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
 from utils.stress_utils import *
@@ -13,10 +13,10 @@ from utils.constants import OBJECT_NAMES
 from model import StressNetOccupancyOnly
 
 
-gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon04_data"
+# dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/all_6polygon_data"
 
 start_time = timeit.default_timer() 
 visualization = False
@@ -28,14 +28,13 @@ num_query_pts = 20000
 # log_stress_visualization_min = np.log(stress_visualization_min)   
 # log_stress_visualization_max = np.log(stress_visualization_max)    
 
-grasp_idx_bounds = [0, 1]
+grasp_idx_bounds = [0, 100]
 # force_levels = np.arange(0.0, 15.25, 2.0)  #np.arange(1, 15.25, 0.25)    [1.0]
 # force_levels = [0.0,3.0,8.0,11.25]   
 
 device = torch.device("cuda")
 model = StressNetOccupancyOnly(num_channels=5).to(device)
-# model = StressNetSDF(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04/epoch 151"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/weights/run1/epoch 150"))
 model.eval()
 
 
@@ -48,7 +47,8 @@ excluded_objects = \
 [f"cylinder0{i}" for i in [1,2,3]] + [f"sphere0{i}" for i in [1,3]]
 
 
-for idx, file_name in enumerate(["6polygon04"]):
+# for idx, file_name in enumerate([f"6polygon0{j}" for j in [3,4,5,6,7,8]]):
+for idx, file_name in enumerate(["6polygon06"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -56,13 +56,12 @@ for idx, file_name in enumerate(["6polygon04"]):
     print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins")
 
 
-    for k in range(0,100):    # 100 grasp poses
-        
-        file_name = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{k}.pickle")        
+    for k in range(10,100):    # 100 grasp poses
+        file_name = os.path.join(gripper_pc_recording_path, f"gripper_data_{object_name}", f"{object_name}_grasp_{k}.pickle")        
         if not os.path.isfile(file_name):
             
             print_color(f"{file_name} not found")
-            continue
+            break
         with open(file_name, 'rb') as handle:
             gripper_data = pickle.load(handle)
         
@@ -95,15 +94,16 @@ for idx, file_name in enumerate(["6polygon04"]):
         pcds = []
         pcd_gts = []
 
-        for force_idx in range(0,61):
+        for force_idx in [0,20,60]:
+        # for force_idx in range(20,61):
             
-            # print(f"{object_name} - grasp {k} - force {force_idx} started")
+            print(f"{object_name} - grasp {k} - force {force_idx} started")
             
             file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{force_idx}.pickle")
 
             if not os.path.isfile(file_name):
                 print(f"{file_name} not found")
-                continue 
+                break 
 
             with open(file_name, 'rb') as handle:
                 data = pickle.load(handle)
@@ -119,7 +119,7 @@ for idx, file_name in enumerate(["6polygon04"]):
                                                     (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
         
             ### Combine object pc and gripper pc
-            combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1)[0:1,:,:] # shape (8, num_pts*2, 5)
+            combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1)[3:4,:,:] # shape (8, num_pts*2, 5)
             combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
             
             
@@ -141,13 +141,13 @@ for idx, file_name in enumerate(["6polygon04"]):
             # # print("Accuracy:", np.sum(predicted_classes == is_inside)/is_inside.shape[0])
             
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            occupied_idxs = np.where(pred_occupancy >= 0.0)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
 
             pcd = pcd_ize(query[occupied_idxs], color=[0,0,1])
             pcd_gt = pcd_ize(full_pc, color=[1,0,0])
             
 
-            # open3d.visualization.draw_geometries([pcd.translate((-0.0,0.00,0)), pcd_gt])
+            open3d.visualization.draw_geometries([pcd.translate((-0.12,0.00,0)), pcd_gt, pcd_gripper])
             
             print_color("========================")
 
@@ -157,15 +157,15 @@ for idx, file_name in enumerate(["6polygon04"]):
             
             # break
 
-        for i, pcd in enumerate(pcds):
-            pcd.translate((0.0,0.04*(i),0))
+        # for i, pcd in enumerate(pcds):
+        #     pcd.translate((0.0,0.06*(i),0))
 
-        for i, pcd_gt in enumerate(pcd_gts):
-            pcd_gt.translate((0.04,0.04*(i),0))
+        # for i, pcd_gt in enumerate(pcd_gts):
+        #     pcd_gt.translate((0.04,0.06*(i),0))
 
-        open3d.visualization.draw_geometries(pcds + pcd_gts)
+        # open3d.visualization.draw_geometries(pcds + pcd_gts)  # + pcd_gts
 
-        break
+        # break
 
 
 

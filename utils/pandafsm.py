@@ -1100,7 +1100,7 @@ class PandaFsm:
             elif f_avg_of_filter > self.max_force_allowed:
                 force_too_high = True            
             if force_too_high:
-                print("Squeezing force too high, reset")
+                print_color("Squeezing force too high, reset")
                 self.state = "done"
 
                 # self.squeezing_close_fails += 1
@@ -1117,7 +1117,7 @@ class PandaFsm:
                 self.squeeze_lost_contact_counter = 0
 
             if self.squeeze_lost_contact_counter > 100:
-                print("Lost contact during squeezing, reset")
+                print_color("Lost contact during squeezing, reset")
                 self.state = "done"
 
                 # self.squeezing_close_fails += 1
@@ -1131,7 +1131,7 @@ class PandaFsm:
             if self.franka_dof_states['pos'][-3:][
                     1] < 0.0001 and self.franka_dof_states['pos'][-3:][
                         2] < 0.0001:
-                print("Can't close that tightly during squeezing, reset") 
+                print_color("Can't close that tightly during squeezing, reset") 
                 self.state = "done"
 
                 # self.squeezing_close_fails += 1
@@ -1145,7 +1145,7 @@ class PandaFsm:
             # (occurs when there are spikes in force readings-> spikes in torque responses)
             if self.franka_dof_states['pos'][-3:][
                     1] > 0.04 or self.franka_dof_states['pos'][-3:][2] > 0.04:
-                print(self.env_id, "Grippers exceeded joint limits, reset")
+                print_color(self.env_id, "Grippers exceeded joint limits, reset")
                 self.state = "done"
 
                 # self.squeezing_close_fails += 1
@@ -1184,6 +1184,10 @@ class PandaFsm:
             #         np.abs(self.f_errs) < 0.05 * self.desired_force
             # ) and not self.squeezed_until_force and squeeze_guard and np.all(
             #         particles_contacting_gripper > 0):
+            
+            if self.f_moving_average[-1] >= self.curr_recording_force + 3.0:    # abrupt change in force
+                print_color("Abrupt change in force. Stop simulation.")
+                self.state = "done"
 
             if self.state != "done" and self.f_moving_average[-1] >= self.curr_recording_force:
 
