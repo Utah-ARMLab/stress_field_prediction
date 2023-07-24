@@ -72,7 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
         # loss_stress /= 95
-        loss_occ *= 85
+        loss_occ *= 80
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/new_sdf_data/ellipsoid01(combined)"
+        "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_8pc_joint"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -184,8 +184,12 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/shinghei_data_ellipsoid01-p1"
-    dataset = StressPredictionDataset3(dataset_path)
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_6polygon04"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_6polygon04"
+    object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
+
+    dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
+    # dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 30     
     
@@ -194,10 +198,10 @@ if __name__ == "__main__":
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap
-    # indices = torch.randint(low=0, high=dataset_size, size=(total_len,))  #torch.randperm(dataset_size)
     indices = np.arange(dataset_size)
     train_indices = indices[:train_len]
     test_indices = indices[train_len:total_len]
+
 
     # Create Subset objects for training and testing datasets
     train_dataset = Subset(dataset, train_indices)

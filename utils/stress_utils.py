@@ -42,12 +42,13 @@ def compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx
     then converted to the scalar von Mises stress (i.e., the second
     invariant of the deviatoric stress), which is widely used to
     quantify whether a material has yielded.     
-    
+
+    tet_stress: shape (num_tetrahedra,). Cauchy stress tensors (3,3) at each tetrahedron.
     """
     avg_cauchy_stress_tensor = np.zeros((3,3))
-    for tetrahedra_idx in adjacent_tetrahedral_dict[vertex_idx]:    
+    for tetrahedra_idx in adjacent_tetrahedral_dict[vertex_idx]:    # iterate through each of tetrahedron that contains vertex_idx    
 
-        cauchy_stress = tet_stress[tetrahedra_idx]
+        cauchy_stress = tet_stress[tetrahedra_idx]  # tetrahedra_idx is a number index
         cauchy_stress_matrix = np.array([[cauchy_stress.x.x, cauchy_stress.y.x, cauchy_stress.z.x],
                                         [cauchy_stress.x.y, cauchy_stress.y.y, cauchy_stress.z.y],
                                         [cauchy_stress.x.z, cauchy_stress.y.z, cauchy_stress.z.z]])
@@ -56,7 +57,7 @@ def compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx
 
     avg_cauchy_stress_tensor /= len(adjacent_tetrahedral_dict[vertex_idx])  # average out over all all adjacent tetrahedras
     
-    von_mises_stress = compute_von_mises_stress(avg_cauchy_stress_tensor)
+    von_mises_stress = compute_von_mises_stress(avg_cauchy_stress_tensor)   # convert 3x3 mat to a scalar
     return von_mises_stress
 
 
@@ -76,7 +77,7 @@ def get_adjacent_tetrahedrals_of_vertex(tet_indices):
     For each vertex in the tetrahedral mesh, find a list of tetrahedral elements that include it.
     ex: 
 
-    mesh = [[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5], [0, 2, 4, 6]]
+    tet_indices = [[0, 1, 2, 3], [1, 2, 3, 4], [2, 3, 4, 5], [0, 2, 4, 6]]
     Vertex 0 belongs to tetrahedra: [[0, 1, 2, 3], [0, 2, 4, 6]]
     Vertex 1 belongs to tetrahedra: [[0, 1, 2, 3]]
     Vertex 2 belongs to tetrahedra: [[0, 1, 2, 3], [1, 2, 3, 4], [0, 2, 4, 6]]
@@ -85,6 +86,8 @@ def get_adjacent_tetrahedrals_of_vertex(tet_indices):
     Vertex 5 belongs to tetrahedra: [[2, 3, 4, 5]]
     Vertex 6 belongs to tetrahedra: [[0, 2, 4, 6]]
 
+    Return: a dict. Key is the vertex index. Value is the list of tetrahedra that this vertex belongs to.
+    ex: {0: [[0, 1, 2, 3], [0, 2, 4, 6]]}
     """
     
     

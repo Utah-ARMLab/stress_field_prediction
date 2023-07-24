@@ -167,7 +167,7 @@ def sample_points_from_mesh(mesh, k):
     """
 
     num_tetrahedra = mesh.shape[0]
-    vertices = mesh.reshape(num_tetrahedra, 4, 3)
+    vertices = mesh.reshape(num_tetrahedra, 4, -1)
 
     points = []
 

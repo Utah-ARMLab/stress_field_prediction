@@ -29,7 +29,7 @@ data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = True
+process_gripper_only = False
 num_pts = 1024
 num_query_pts = 2000
 
@@ -52,12 +52,13 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
     tri_indices = static_data["tri_indices"]
     tet_indices = static_data["tet_indices"]
     homo_mats = static_data["homo_mats"]
+    adjacent_tetrahedral_dict = static_data["adjacent_tetrahedral_dict"]
     # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
     for grasp_idx in range(*grasp_idx_bounds):        
         print(f"{object_name} - grasp {grasp_idx} started. Time passed: {timeit.default_timer() - start_time}")
         
-        get_gripper_pc = True
+        get_gripper_pc = False
         
         for force_idx in range(0,61):
             
@@ -66,7 +67,7 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force_idx}.pickle")
             if not os.path.isfile(file_name):
                 # print_color(f"{file_name} not found")
-                break   #continue  
+                break   
             
             with open(file_name, 'rb') as handle:
                 data = pickle.load(handle)
@@ -112,16 +113,31 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
 
             full_pc = object_particle_state            
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
+            all_stresses = np.log(compute_all_stresses(tet_stress, adjacent_tetrahedral_dict, full_pc.shape[0]))    # np.log needs fixing, e.g. np.log(0.0) undefined 
+            # all_stresses = np.random.uniform(size=full_pc.shape[0])
             # print("full_pc.shape:", full_pc.shape)
+
+            # pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
+            # pcd = pcd_ize(full_pc, color=[0,0,0])
+            # colors = np.array(scalar_to_rgb(all_stresses, colormap='jet'))[:,:3]
+            # pcd.colors = open3d.utility.Vector3dVector(colors) 
+            # open3d.visualization.draw_geometries([pcd, pcd_gripper]) 
 
 
             ### Points belongs the object volume   
             if num_query_pts > full_pc.shape[0]:                  
-                num_pts_each_tetrahedron = int(np.ceil((num_query_pts-full_pc.shape[0]) / tet_indices.shape[0]))   
-                points_from_tet_mesh = sample_points_from_mesh(full_pc[tet_indices], k=num_pts_each_tetrahedron)
+                   
+                full_pc_w_stress = np.concatenate((full_pc, all_stresses[:, np.newaxis]), axis=1)   # shape (num_pts, 4)
+
+                num_pts_each_tetrahedron = int(np.ceil((num_query_pts-full_pc.shape[0]) / tet_indices.shape[0]))
+                points_from_tet_mesh = sample_points_from_mesh(full_pc_w_stress[tet_indices], k=num_pts_each_tetrahedron)
                 selected_idxs = np.random.choice(points_from_tet_mesh.shape[0], size=num_query_pts-full_pc.shape[0], replace=False) # only select a few points sampled from the tet mesh.
-                query_points_volume = np.concatenate((full_pc, points_from_tet_mesh[selected_idxs])) # concat the object particles with these newly selected points.
+                
+                query_points_volume = np.concatenate((full_pc, points_from_tet_mesh[selected_idxs][:,:3])) # concat the object particles with these newly selected points.
+                stress_volume = np.concatenate((full_pc_w_stress[:,3:], points_from_tet_mesh[selected_idxs][:,3:])).squeeze()
+
                 # print("num_pts_each_tetrahedron:", num_pts_each_tetrahedron) 
+                # print(query_points_volume.shape, stress_volume.shape)
                 
                 
             else:
@@ -134,36 +150,37 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
 
 
             ### Gaussian random points (outside object mesh)              
-            query_points_outside, is_inside = sample_points_gaussian(object_mesh, round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
-            occupancy_outside = np.zeros(num_query_pts)
-            occupancy_outside[np.where(is_inside==True)[0]] = 1
+            query_points_outside = sample_points_gaussian_3(object_mesh, round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
+            occupancy_outside = np.zeros(query_points_outside.shape[0])
+            stress_outside = -4 * np.ones(query_points_outside.shape[0])
+
 
             assert query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts
                                        
 
-
             all_query_points = np.concatenate((query_points_volume, query_points_outside), axis=0)
             all_occupancies = np.concatenate((occupancy_volume, occupancy_outside), axis=0)    
-            
+            all_stresses = np.concatenate((stress_volume, stress_outside), axis=0) 
+            # print(all_query_points.shape, all_occupancies.shape, all_stresses.shape)
+
             
             processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
-                            "force": force, 
+                            "stress_log": all_stresses, "force": force, 
                             "young_modulus": np.log(young_modulus), 
                             "object_name": object_name, "grasp_idx": grasp_idx}
                                         
-
+            
             with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
                 pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
             data_point_count += 1
 
 
+
             # pcd_query_inside = pcd_ize(query_points_volume, color=[0,1,0], vis=False) 
             # pcd_full = pcd_ize(full_pc, color=[0,0,0], vis=False)
-            # pcd_query_outside = pcd_ize(query_points_outside[is_inside==False], color=[1,0,0], vis=False) 
-            # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])
-
-                
+            # pcd_query_outside = pcd_ize(query_points_outside, color=[1,0,0], vis=False) 
+            # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])                
 
 
         #     break

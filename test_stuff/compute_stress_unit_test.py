@@ -22,7 +22,7 @@ data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6
 start_time = timeit.default_timer()
 num_pts = 1024
 
-grasp_idx_bounds = [0, 1]
+grasp_idx_bounds = [20, 30]
 
 
 for object_name in ["6polygon04"]:
@@ -31,7 +31,7 @@ for object_name in ["6polygon04"]:
     ### Get static data
     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
         static_data = pickle.load(handle)
-    tet_indices = static_data["tet_indices"]
+    tet_indices = static_data["tet_indices"] # shape (num_tetrahedra, 4)
     tri_indices = static_data["tri_indices"]
     adjacent_tetrahedral_dict = static_data["adjacent_tetrahedral_dict"]
 
@@ -40,7 +40,7 @@ for object_name in ["6polygon04"]:
         
         get_gripper_pc = True
         
-        for force_idx in range(10,11):
+        for force_idx in range(50,51):
             
             # print(f"{object_name} - grasp {grasp_idx} - force {force} started")
             
@@ -54,10 +54,9 @@ for object_name in ["6polygon04"]:
 
 
             full_pc = data["object_particle_state"] 
-            tet_stress = data["tet_stress"]    
-            young_modulus = int(float(data["young_modulus"]))
-            object_particle_state = data["object_particle_state"]
+            tet_stress = data["tet_stress"] # shape (num_tetrahedra,): Cauchy stress tensors (3,3) at each tetrahedron 
             force = data["force"]
+            print("force:", force)
             grasp_pose = data["grasp_pose"]
             fingers_joint_angles = data["fingers_joint_angles"]
             
