@@ -199,6 +199,7 @@ def sample_points_gaussian_3(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], toler
     """ 
     Sample points from object mesh surface. Then add to each point some half-gaussian noise (only positive).
     Also, ensure that all query points are un-occupied, by ignoring the occupied points.
+    object_mesh: surface mesh.
     tolerance: minimum signed distance of a query point to be considered to belong to the object volume.
     """
 

@@ -9,7 +9,7 @@ import argparse
 import isaacgym
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_tet_mesh, print_color
+from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_mesh, print_color
 from utils.stress_utils import *
 from utils.point_cloud_utils import transform_point_cloud
 from utils.constants import OBJECT_NAMES
@@ -22,7 +22,7 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 # gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
 # os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/all_6polygon_data_new"
+data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/all_6polygon_data"
 # data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
 # os.makedirs(data_processed_path, exist_ok=True)
 
@@ -44,7 +44,7 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
         data_point_count = len(os.listdir(data_processed_path))
     gripper_pc_recording_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_{object_name}"
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
-
+    
 
     ### Get static data
     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
@@ -54,7 +54,6 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
     homo_mats = static_data["homo_mats"]
     adjacent_tetrahedral_dict = static_data["adjacent_tetrahedral_dict"]
     # partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
-    
 
     for grasp_idx in range(*grasp_idx_bounds):        
         print(f"{object_name} - grasp {grasp_idx} started. Time passed: {timeit.default_timer() - start_time}")
@@ -113,9 +112,10 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
 
 
             full_pc = object_particle_state            
-            object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))  # reconstruct the surface mesh.
+            object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))
             all_stresses = np.log(compute_all_stresses(tet_stress, adjacent_tetrahedral_dict, full_pc.shape[0]))    # np.log needs fixing, e.g. np.log(0.0) undefined 
             # all_stresses = np.random.uniform(size=full_pc.shape[0])
+            # print("full_pc.shape:", full_pc.shape)
 
             # pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
             # pcd = pcd_ize(full_pc, color=[0,0,0])
@@ -124,28 +124,32 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             # open3d.visualization.draw_geometries([pcd, pcd_gripper]) 
 
 
-            ### Points belongs the object volume - (positive samples)   
+            ### Points belongs the object volume   
             if num_query_pts > full_pc.shape[0]:                  
                    
                 full_pc_w_stress = np.concatenate((full_pc, all_stresses[:, np.newaxis]), axis=1)   # shape (num_pts, 4)
 
                 num_pts_each_tetrahedron = int(np.ceil((num_query_pts-full_pc.shape[0]) / tet_indices.shape[0]))
-                points_from_tet_mesh = sample_points_from_tet_mesh(full_pc_w_stress[tet_indices], k=num_pts_each_tetrahedron)   # sample points from the volumetric mesh
+                points_from_tet_mesh = sample_points_from_mesh(full_pc_w_stress[tet_indices], k=num_pts_each_tetrahedron)
                 selected_idxs = np.random.choice(points_from_tet_mesh.shape[0], size=num_query_pts-full_pc.shape[0], replace=False) # only select a few points sampled from the tet mesh.
                 
                 query_points_volume = np.concatenate((full_pc, points_from_tet_mesh[selected_idxs][:,:3])) # concat the object particles with these newly selected points.
-                stress_volume = np.concatenate((full_pc_w_stress[:,3:], points_from_tet_mesh[selected_idxs][:,3:])).squeeze()   # stress at each query points
+                stress_volume = np.concatenate((full_pc_w_stress[:,3:], points_from_tet_mesh[selected_idxs][:,3:])).squeeze()
 
                 # print("num_pts_each_tetrahedron:", num_pts_each_tetrahedron) 
+                # print(query_points_volume.shape, stress_volume.shape)
                 
                 
             else:
                 query_points_volume = full_pc[:num_query_pts]
             
-            occupancy_volume = np.ones(query_points_volume.shape[0])   # occupancy at each query points
+            occupancy_volume = np.ones(query_points_volume.shape[0])
+            # print("query_points_volume.shape", query_points_volume.shape)
+            # pcd_ize(query_points_volume, color=[0,0,0], vis=True)
 
 
-            ### Gaussian random points (outside object mesh) - (negative samples)              
+
+            ### Gaussian random points (outside object mesh)              
             query_points_outside = sample_points_gaussian_3(object_mesh, round(num_query_pts), scales=[1.2]*3, tolerance=0.0005) 
             occupancy_outside = np.zeros(query_points_outside.shape[0])
             stress_outside = -4 * np.ones(query_points_outside.shape[0])
@@ -157,7 +161,7 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             all_query_points = np.concatenate((query_points_volume, query_points_outside), axis=0)
             all_occupancies = np.concatenate((occupancy_volume, occupancy_outside), axis=0)    
             all_stresses = np.concatenate((stress_volume, stress_outside), axis=0) 
-
+            # print(all_query_points.shape, all_occupancies.shape, all_stresses.shape)
 
             
             processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
@@ -166,10 +170,10 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
                             "object_name": object_name, "grasp_idx": grasp_idx}
                                         
             
-            # with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-            #     pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+                pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-            # data_point_count += 1
+            data_point_count += 1
 
 
 

@@ -34,7 +34,7 @@ from utils import uniform_sphere
 from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, down_sampling
 from utils.camera_utils import *
-from utils.point_cloud_utils import homogeneous_transform_to_object_frame, transform_point_cloud
+from utils.point_cloud_utils import world_to_object_frame, transform_point_cloud
 from utils.stress_utils import get_adjacent_tetrahedrals_of_vertex
 from isaacgym import gymtorch
 import pickle
@@ -428,20 +428,20 @@ class StaticDataCollection:
                 # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
                 (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
-                tri_indices = np.array(tri_indices).reshape(-1,3)
+                tri_indices = np.array(tri_indices).reshape(-1,3)   # shape (num_triangles, 3)
                 
-                (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)
-                tet_indices = np.array(tet_indices).reshape(-1,4)
+                (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)    
+                tet_indices = np.array(tet_indices).reshape(-1,4)   # shape (num_tetrahedra, 4)
                 # print(tri_indices.shape, tet_indices.shape)
                 
-                homo_mats = []
+                homo_mats = []  # length partial_pcs.shape[0] or num_cameras
                 for pc in partial_pcs:
-                    homo_mats.append(homogeneous_transform_to_object_frame(pc))
+                    homo_mats.append(world_to_object_frame(pc)) # transform point clouds in world frame, to point clouds in object frame.
 
                 transformed_partial_pcs = []
                 for i in range(8):
                     transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
-                transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0)     
+                transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
                 # print(transformed_partial_pcs.shape)       
 
 

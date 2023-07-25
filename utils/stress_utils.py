@@ -43,17 +43,12 @@ def compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx
     invariant of the deviatoric stress), which is widely used to
     quantify whether a material has yielded.     
 
-    tet_stress: shape (num_tetrahedra,). Cauchy stress tensors (3,3) at each tetrahedron.
+    tet_stress: shape (num_tetrahedra, 3, 3). Cauchy stress tensors (3,3) at each tetrahedron.
     """
     avg_cauchy_stress_tensor = np.zeros((3,3))
     for tetrahedra_idx in adjacent_tetrahedral_dict[vertex_idx]:    # iterate through each of tetrahedron that contains vertex_idx    
-
-        cauchy_stress = tet_stress[tetrahedra_idx]  # tetrahedra_idx is a number index
-        cauchy_stress_matrix = np.array([[cauchy_stress.x.x, cauchy_stress.y.x, cauchy_stress.z.x],
-                                        [cauchy_stress.x.y, cauchy_stress.y.y, cauchy_stress.z.y],
-                                        [cauchy_stress.x.z, cauchy_stress.y.z, cauchy_stress.z.z]])
         
-        avg_cauchy_stress_tensor += cauchy_stress_matrix
+        avg_cauchy_stress_tensor += tet_stress[tetrahedra_idx]
 
     avg_cauchy_stress_tensor /= len(adjacent_tetrahedral_dict[vertex_idx])  # average out over all all adjacent tetrahedras
     
@@ -103,3 +98,5 @@ def get_adjacent_tetrahedrals_of_vertex(tet_indices):
         adjacent_tetrahedral_dict.setdefault(v4, []).append(idx)
 
     return adjacent_tetrahedral_dict
+
+

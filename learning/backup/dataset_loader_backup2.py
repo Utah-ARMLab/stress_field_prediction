@@ -92,30 +92,24 @@ class StressPredictionObjectFrameDataset(Dataset):
     Dataset for training either only occupancy, or stress and occupancy jointly. Using 8 partial pc from 8 camera views, transformed to object frame.
     """
 
-    def __init__(self, dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=False):
+    def __init__(self, dataset_path, gripper_pc_path, object_partial_pc_path, joint_training=False):
         self.dataset_path = dataset_path
+        self.filenames = os.listdir(self.dataset_path)
         self.gripper_pc_path = gripper_pc_path
         self.object_partial_pc_path = object_partial_pc_path   
-        self.object_names = object_names
         self.joint_training = joint_training    # bool: training either only occupancy, or stress and occupancy jointly     
 
-        self.file_names = []
-        for object_name in object_names:            
-            self.file_names += [os.path.join(f"processed_data_{object_name}", file) for file 
-                               in os.listdir(os.path.join(self.dataset_path, f"processed_data_{object_name}"))]
-            
-        random.shuffle(self.file_names)
 
     def load_pickle_data(self, filename):
         with open(os.path.join(self.dataset_path, filename), 'rb') as handle:
             return pickle.load(handle)            
 
     def __len__(self):
-        return len(self.file_names)
+        return len(self.filenames)
 
     def __getitem__(self, idx):   
 
-        query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, self.file_names[idx]))  # shape (B, 3)
+        query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, f"processed sample {idx}.pickle"))  # shape (B, 3)
         object_name = query_data["object_name"]
         grasp_idx = query_data["grasp_idx"]
         force = query_data["force"]

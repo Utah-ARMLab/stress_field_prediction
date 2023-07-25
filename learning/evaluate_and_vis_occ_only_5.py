@@ -22,7 +22,7 @@ start_time = timeit.default_timer()
 visualization = False
 query_type = "sampled"  # options: sampled, full
 num_pts = 1024
-num_query_pts = 20000
+num_query_pts = 10000
 # stress_visualization_min = 0.001   
 # stress_visualization_max = 5e3 
 # log_stress_visualization_min = np.log(stress_visualization_min)   
@@ -48,7 +48,7 @@ excluded_objects = \
 
 
 # for idx, file_name in enumerate([f"6polygon0{j}" for j in [3,4,5,6,7,8]]):
-for idx, file_name in enumerate(["6polygon06"]):
+for idx, file_name in enumerate(["6polygon08"]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
@@ -56,7 +56,7 @@ for idx, file_name in enumerate(["6polygon06"]):
     print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins")
 
 
-    for k in range(10,100):    # 100 grasp poses
+    for k in range(17,100):    # 100 grasp poses
         file_name = os.path.join(gripper_pc_recording_path, f"gripper_data_{object_name}", f"{object_name}_grasp_{k}.pickle")        
         if not os.path.isfile(file_name):
             
@@ -94,7 +94,7 @@ for idx, file_name in enumerate(["6polygon06"]):
         pcds = []
         pcd_gts = []
 
-        for force_idx in [0,20,60]:
+        for force_idx in [50]:
         # for force_idx in range(20,61):
             
             print(f"{object_name} - grasp {k} - force {force_idx} started")

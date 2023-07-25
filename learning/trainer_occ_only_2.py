@@ -148,7 +148,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_8pc_joint"
+        "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_8pc_transformed"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -165,8 +165,8 @@ if __name__ == "__main__":
     gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_6polygon04"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
 
-    dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
-    # dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path)
+    # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
+    dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset_size = len(os.listdir(dataset_path))
     batch_size = 40     
     

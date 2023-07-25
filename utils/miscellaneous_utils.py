@@ -78,6 +78,24 @@ def get_object_particle_state(gym, sim, vis=False):
 #     object_pc = get_partial_pointcloud_vectorized(gym, sim, env, cam_handle, cam_prop, robot_segmentationId, "deformable", None, min_z, vis, device="cpu")
 #     object_particle_position = get_object_particle_state(gym, sim)
 
+# def record_data_stress_prediction(data_recording_path, gym, sim, 
+#                                 current_force, grasp_pose, fingers_joint_angles, 
+#                                 object_name, young_modulus, object_scale):
+                                    
+#     ### Get current object particle state:
+#     object_particle_state = get_object_particle_state(gym, sim)
+
+#     (tet_indices, tet_stress) = gym.get_sim_tetrahedra(sim)
+
+       
+#     data = {"object_particle_state": object_particle_state, "force": current_force, 
+#         "grasp_pose": grasp_pose, "fingers_joint_angles": fingers_joint_angles, 
+#         "tet_stress": tet_stress, 
+#         "object_name": object_name, "young_modulus": young_modulus, "object_scale": object_scale}    
+    
+#     with open(data_recording_path, 'wb') as handle:
+#         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+
 def record_data_stress_prediction(data_recording_path, gym, sim, 
                                 current_force, grasp_pose, fingers_joint_angles, 
                                 object_name, young_modulus, object_scale):
@@ -85,12 +103,20 @@ def record_data_stress_prediction(data_recording_path, gym, sim,
     ### Get current object particle state:
     object_particle_state = get_object_particle_state(gym, sim)
 
-    (tet_indices, tet_stress) = gym.get_sim_tetrahedra(sim)
+    (tet_indices, tet_stress) = gym.get_sim_tetrahedra(sim)    # tet_stress: shape (num_tetrahedra,)
+
+    all_cauchy_stresses = []
+    for cauchy_stress in tet_stress:
+        cauchy_stress_matrix = np.array([[cauchy_stress.x.x, cauchy_stress.y.x, cauchy_stress.z.x],
+                                        [cauchy_stress.x.y, cauchy_stress.y.y, cauchy_stress.z.y],
+                                        [cauchy_stress.x.z, cauchy_stress.y.z, cauchy_stress.z.z]])
+        all_cauchy_stresses.append(cauchy_stress_matrix) 
+    all_cauchy_stresses = np.array(all_cauchy_stresses)    # shape (num_tetrahedra, 3, 3)
 
        
     data = {"object_particle_state": object_particle_state, "force": current_force, 
         "grasp_pose": grasp_pose, "fingers_joint_angles": fingers_joint_angles, 
-        "tet_stress": tet_stress, 
+        "tet_stress": all_cauchy_stresses, 
         "object_name": object_name, "young_modulus": young_modulus, "object_scale": object_scale}    
     
     with open(data_recording_path, 'wb') as handle:
@@ -158,7 +184,7 @@ def compute_weighted_average(vertices, weights):
     # Compute the weighted average for each set of weights and vertices
     return np.einsum('ijk,ij->ik', vertices, weights)
 
-def sample_points_from_mesh(mesh, k):
+def sample_points_from_tet_mesh(mesh, k):
 
     """ 
     Sample points from the tetrahedral mesh by executing the following procedure:

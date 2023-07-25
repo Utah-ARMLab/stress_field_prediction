@@ -1,5 +1,6 @@
 import numpy as np
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA
+import trimesh
 
 def is_homogeneous_matrix(matrix):
     # Check matrix shape
@@ -23,42 +24,94 @@ def is_homogeneous_matrix(matrix):
 
     return True
 
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
 
-def homogeneous_transform_to_object_frame(points):
-    """  
-    Compute 4x4 homogeneous transformation matrix to transform global frame to object frame.
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+            >>> angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+            >>> angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+            >>> angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
     """
-    
-    # Step 1: Use PCA to find the dominant axis (x-axis, y-axis)
-    pca_operator = PCA(n_components=3, svd_solver='full')
-    pca_operator.fit(points)
-    centroid = pca_operator.mean_
-    x_axis = pca_operator.components_[0]
-    y_axis = pca_operator.components_[1]
-    z_axis = np.cross(x_axis,y_axis)
-    # print(z_axis)
-    
-    if z_axis[2] < 0:
-        # if x_axis[0] < 0:
-        #     x_axis *= -1
-        # else:
-        #     y_axis *= -1
-        x_axis *= -1
-        z_axis *= -1
-        
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
-    # Step 4: Create the transformation matrix
-    rotation_matrix = np.column_stack((x_axis, y_axis, z_axis))
-    translation_vector = centroid
+def find_min_ang_vec(world_vec, cam_vecs):
+    min_ang = float('inf')
+    min_ang_idx = -1
+    min_ang_vec = None
+    for i in range(cam_vecs.shape[1]):
+        angle = angle_between(world_vec, cam_vecs[:, i])
+        larger_half_pi = False
+        if angle > np.pi * 0.5:
+            angle = np.pi - angle
+            larger_half_pi = True
+        if angle < min_ang:
+            min_ang = angle
+            min_ang_idx = i
+            if larger_half_pi:
+                min_ang_vec = -cam_vecs[:, i]
+            else:
+                min_ang_vec = cam_vecs[:, i]
 
-    # Combine rotation and translation into a 4x4 homogeneous transformation matrix
-    transformation_matrix = np.eye(4)
-    transformation_matrix[:3, :3] = rotation_matrix
-    transformation_matrix[:3, 3] = translation_vector
+    return min_ang_vec, min_ang_idx
+
+def world_to_object_frame(points):
+
+    """  
+    Compute 4x4 homogeneous transformation matrix to transform world frame to object frame. 
+    The object frame is obtained by fitting a bounding box to the object partial-view point cloud.
+    The centroid of the bbox is the the origin of the object frame.
+    x, y, z axes are the orientation of the bbox.
+    We then compare these computed axes against the ground-truth axes ([1,0,0], [0,1,0], [0,0,1]) and align them properly.
+    For example, if the computed x-axis is [0.3,0.0,0.95], which is most similar to [0,0,1], this axis would be set to be the new z-axis.
     
-    assert is_homogeneous_matrix(transformation_matrix)
+    **This function is used to define a new frame for the object point cloud. Crucially, it creates the training data and defines the pc for test time.
 
-    return transformation_matrix
+    (Input) points: object partial-view point cloud. Shape (num_pts, 3)
+    """
+
+    # Create a trimesh.Trimesh object from the point cloud
+    point_cloud = trimesh.points.PointCloud(points)
+
+    # Compute the oriented bounding box (OBB) of the point cloud
+    obb = point_cloud.bounding_box_oriented
+
+    homo_mat = obb.primitive.transform
+    axes = obb.primitive.transform[:3,:3]   # x, y, z axes concat together
+
+    # Find and align z axis
+    z_axis = [0., 0., 1.]
+    align_z_axis, min_ang_axis_idx = find_min_ang_vec(z_axis, axes)
+    axes = np.delete(axes, min_ang_axis_idx, axis=1)
+
+    # Find and align x axis.
+    x_axis = [1., 0., 0.]
+    align_x_axis, min_ang_axis_idx = find_min_ang_vec(x_axis, axes) 
+    axes = np.delete(axes, min_ang_axis_idx, axis=1)
+
+    # Find and align y axis
+    y_axis = [0., 1., 0.]
+    align_y_axis, min_ang_axis_idx = find_min_ang_vec(y_axis, axes) 
+
+    R_o_w = np.column_stack((align_x_axis, align_y_axis, align_z_axis))
+    
+    # Transpose to get rotation from world to object frame.
+    R_w_o = np.transpose(R_o_w)
+    d_w_o_o = np.dot(-R_w_o, homo_mat[:3,3])
+    
+    homo_mat[:3,:3] = R_w_o
+    homo_mat[:3,3] = d_w_o_o
+
+    assert is_homogeneous_matrix(homo_mat)
+
+    return homo_mat
 
 
 def transform_point_cloud(point_cloud, transformation_matrix):

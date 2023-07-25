@@ -167,30 +167,31 @@ def transform_point_cloud(point_cloud, transformation_matrix):
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"  # _original
 
 ### Get static data
-object_name = "6polygon04"  #6polygon04 ellipsoid01
+object_name = "6polygon06"  #6polygon04 ellipsoid01
 with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
     static_data = pickle.load(handle)
 partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
 coor_objects = []
 
-for i in range(1):
+for i in range(8):
     print(f"View {i}")
     pc = partial_pcs[i]
-    coor_global = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.04)
+    coor_global = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
 
     homo_mat = homogeneous_transform_to_object_frame(pc)
-    coor_object = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
-    coor_object.transform(homo_mat)
-    pc_transformed = transform_point_cloud(pc, homo_mat)
-    # print(homo_mat)
+#     coor_object = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
+#     coor_object.transform(homo_mat)
+#     pc_transformed = transform_point_cloud(pc, homo_mat)
+#     # print(homo_mat)
 
 
-    pcd = pcd_ize(pc, color=[0,0,0])
-    pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
-    open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
+#     pcd = pcd_ize(pc, color=[0,0,0])
+#     pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
+#     # open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
+#     # open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global])
     
-    coor_objects.append(coor_object)
+#     coor_objects.append(coor_object)
     
 # open3d.visualization.draw_geometries(coor_objects) 
     

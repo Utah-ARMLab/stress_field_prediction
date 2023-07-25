@@ -4,7 +4,9 @@ import pickle5 as pickle
 import os
 
 
-weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/mgn_dataset/weights/run2(conv1d)"
+# weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/weights/run1"
+weight_path = "/home/baothach/shape_servo_data/stress_field_prediction/weights/6polygon04_8pc_joint"
+
 with open(os.path.join(weight_path, "saved_losses_accuracies.pickle"), 'rb') as handle:
     data = pickle.load(handle)
     
