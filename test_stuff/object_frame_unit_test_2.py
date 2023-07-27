@@ -182,14 +182,14 @@ for i in range(8):
     homo_mat = homogeneous_transform_to_object_frame(pc)
 #     coor_object = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.02)
 #     coor_object.transform(homo_mat)
-#     pc_transformed = transform_point_cloud(pc, homo_mat)
+    pc_transformed = transform_point_cloud(pc, homo_mat)
 #     # print(homo_mat)
 
 
-#     pcd = pcd_ize(pc, color=[0,0,0])
-#     pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
+    pcd = pcd_ize(pc, color=[0,0,0])
+    pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
 #     # open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
-#     # open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global])
+    open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global])
     
 #     coor_objects.append(coor_object)
     

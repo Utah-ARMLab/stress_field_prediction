@@ -38,7 +38,7 @@ from isaacgym import gymtorch
 import pickle
 
 
-# python3 run_grasp_evaluation.py --object=rectangle --grasp_ind=3 --youngs=2e3 --density=1000 --ori_start=10 --ori_end=10 --mode=pickup
+# Example command: python3 run_grasp_evaluation.py --object=6polygon04 --grasp_ind=0
 
 class GraspEvaluator:
     """Simulate selected object, grasp, material params, and evaluation mode."""

@@ -222,14 +222,14 @@ def world_to_object_frame(points):
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"  # _original
 
 ### Get static data
-object_name = "6polygon06"  #6polygon04 ellipsoid01
+object_name = "6polygon04"  #6polygon04 ellipsoid01
 with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
     static_data = pickle.load(handle)
 partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
 
 coor_objects = []
 
-for i in range(1):
+for i in range(8):
     print(f"View {i}")
     pc = partial_pcs[i] #+ np.array([0.2,0,0])
     pc = apply_random_transformation(pc)

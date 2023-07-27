@@ -92,7 +92,7 @@ class StressPredictionObjectFrameDataset(Dataset):
     Dataset for training either only occupancy, or stress and occupancy jointly. Using 8 partial pc from 8 camera views, transformed to object frame.
     """
 
-    def __init__(self, dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=False):
+    def __init__(self, dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True):
         self.dataset_path = dataset_path
         self.gripper_pc_path = gripper_pc_path
         self.object_partial_pc_path = object_partial_pc_path   
@@ -103,7 +103,7 @@ class StressPredictionObjectFrameDataset(Dataset):
         for object_name in object_names:            
             self.file_names += [os.path.join(f"processed_data_{object_name}", file) for file 
                                in os.listdir(os.path.join(self.dataset_path, f"processed_data_{object_name}"))]
-            
+    
         random.shuffle(self.file_names)
 
     def load_pickle_data(self, filename):
@@ -122,7 +122,7 @@ class StressPredictionObjectFrameDataset(Dataset):
         young_modulus = query_data["young_modulus"]
         
         ### Load robot gripper point cloud
-        gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, 
+        gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 
                                     f"{object_name}_grasp_{grasp_idx}.pickle"))["transformed_gripper_pcs"]   # shape (8, num_pts, 3)
         augmented_gripper_pcs = np.concatenate([gripper_pcs, np.tile(np.array([[0, 0]]), 
                                                 (8, gripper_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)        

@@ -29,14 +29,14 @@ data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = True
+process_gripper_only = False
 num_pts = 1024
 num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [4]]:
+for object_name in [f"6polygon0{j}" for j in [8]]:
 
     if not process_gripper_only:
         data_processed_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_{object_name}"
@@ -166,10 +166,10 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
                             "object_name": object_name, "grasp_idx": grasp_idx}
                                         
             
-            # with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
-            #     pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            with open(os.path.join(data_processed_path, f"processed sample {data_point_count}.pickle"), 'wb') as handle:
+                pickle.dump(processed_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-            # data_point_count += 1
+            data_point_count += 1
 
 
 
@@ -179,7 +179,7 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])                
 
 
-        #     break
+            # break
         # break
         
         
