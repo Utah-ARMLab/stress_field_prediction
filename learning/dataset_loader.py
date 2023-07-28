@@ -115,15 +115,15 @@ class StressPredictionObjectFrameDataset(Dataset):
 
     def __getitem__(self, idx):   
         
-        num_partial_pc = 1  # 8
+        num_partial_pc = 8  # 8 1
 
         query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, self.file_names[idx]))  # shape (B, 3)
         object_name = query_data["object_name"]
         grasp_idx = query_data["grasp_idx"]
         force = query_data["force"]
         # young_modulus = query_data["young_modulus"]
-        young_modulus = np.exp(query_data["young_modulus"])/1e4
-        # print("young_modulus", young_modulus)
+        young_modulus = query_data["young_modulus"]/1e4
+        print("young_modulus", young_modulus)
         
         ### Load robot gripper point cloud
         gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 

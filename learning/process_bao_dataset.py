@@ -30,14 +30,14 @@ data_recording_path = os.path.join(data_main_path, "all_6polygon_data")
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = True
+process_gripper_only = False
 num_pts = 1024
 num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [4]]:
+for object_name in [f"6polygon0{j}" for j in [3,4,5,6]]:
 
     if not process_gripper_only:
         data_processed_path = os.path.join(data_main_path,  f"processed_data_{object_name}")       
@@ -163,7 +163,7 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             
             processed_data = {"query_points": all_query_points, "occupancy": all_occupancies,                                     
                             "stress_log": all_stresses, "force": force, 
-                            "young_modulus": np.log(young_modulus), 
+                            "young_modulus": young_modulus, 
                             "object_name": object_name, "grasp_idx": grasp_idx}
                                         
             

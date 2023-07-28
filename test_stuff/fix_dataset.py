@@ -11,7 +11,7 @@ from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data,
 
 
 """ 
-fix object_height_buffer problem 0.001 in 6polygon04 data.
+fix object_height_buffer 0.001 problem in 6polygon04 data.
 """
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
@@ -53,16 +53,16 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             with open(file_name, 'rb') as handle:
                 data = pickle.load(handle)
 
-            print("(BEFORE) max_z partial + full:", max(partial_pc[:,2]), max(data["object_particle_state"][:,2]))
+            print("(BEFORE) max_z partial - full:", max(partial_pc[:,2]) - max(data["object_particle_state"][:,2]))
             pcd_partial = pcd_ize(partial_pc, color=[0,0,1])
             pcd_full = pcd_ize(data["object_particle_state"], color=[1,0,0])
             open3d.visualization.draw_geometries([pcd_full, pcd_partial])
             
             
-            data["object_particle_state"][:,2] -= 0.001
-            print("(AFTER) max_z partial + full:", max(partial_pc[:,2]), max(data["object_particle_state"][:,2]))
-            pcd_full = pcd_ize(data["object_particle_state"], color=[1,0,0])
-            open3d.visualization.draw_geometries([pcd_full, pcd_partial])  
+            # data["object_particle_state"][:,2] -= 0.001
+            # print("(AFTER) max_z partial - full:", max(partial_pc[:,2]) - max(data["object_particle_state"][:,2]))
+            # pcd_full = pcd_ize(data["object_particle_state"], color=[1,0,0])
+            # open3d.visualization.draw_geometries([pcd_full, pcd_partial])  
             
             if fix_data:            
                 with open(file_name, 'wb') as handle:

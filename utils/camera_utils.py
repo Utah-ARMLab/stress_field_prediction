@@ -189,3 +189,221 @@ def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], o
         images.append(torch.from_numpy(image).permute(2,0,1) )
 
     display_images(images, output_file=output_file)
+
+
+def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[500,500], cam_position=[0.0, 0.0, 1.0], cam_target=[0, 0, 0], display_on_screen=False):
+    """
+    Export open3d objects (point cloud, mesh, etc.) scene to an image. Don't have to manually screenshot anymore.
+    
+    open3d_objects (list): open3d point cloud, mesh, etc.
+    image_path: path to save the screenshot to. If None, return the image as a NumPy array instead of saving it to a file.
+    img_resolution: resolution of the screenshot image. Ex: [600,600]
+    cam_position: camera direction. Ex: [0.0, 0.0, 1.0]
+    cam_target: camera target point. Ex: [0.0, 0.0, 0.0]
+    display_on_screen: the screenshot image will be displayed on the screen. Default is False.
+    
+    """
+
+    vis = open3d.visualization.Visualizer()
+    vis.create_window(visible=True, width=img_resolution[0], height=img_resolution[1]) # works for me with True, on some systems needs to be False
+    for open3d_object in open3d_objects:
+        vis.add_geometry(open3d_object)
+    # vis.update_geometry(pcd)
+
+
+    ### Change viewing angle for the screenshot
+    view_control = vis.get_view_control()
+    front = cam_position  # Camera direction (default is [0, 0, -1])
+    lookat = cam_target  # Camera target point (default is [0, 0, 0])
+    view_control.set_front(front)
+    view_control.set_lookat(lookat)
+
+
+    vis.poll_events()
+    vis.update_renderer()
+    
+    if image_path is None:  # return the image as a NumPy array instead of saving it to a file
+        image = np.asarray(vis.capture_screen_float_buffer(True))   # get the image as a np array 
+        vis.destroy_window()
+        image = (image * 255).astype(np.uint8)  # Normalize the image array to [0, 255] and convert to uint8 type        
+        return image
+        
+    if display_on_screen:    
+        vis.capture_screen_image(image_path)
+        vis.destroy_window()  
+
+
+
+
+def overlay_texts_on_image(image, texts, font_size=20, output_path=None, display_on_screen=False, positions=None, text_color=(255, 0, 0), return_numpy_array=False, font_name='sans-serif'):
+
+    from PIL import Image, ImageDraw, ImageFont
+    from matplotlib import font_manager
+    import cv2
+
+    """
+    Overlay multiple texts on an image and optionally save it or display it.
+
+    Parameters:
+        image (str or numpy.ndarray): Path to the input image or a numpy array representing the image.
+        texts (list): List of strings, each representing a text to be overlaid.
+        font_size (int, optional): Font size for the texts. Default is 20.
+        output_path (str or None, optional): Path to save the resulting image. If None, the image will be displayed
+            on the screen using opencv. Default is None.
+        display_on_screen: the image will be displayed on the screen using opencv. Default is False.
+        positions (list or None, optional): List of (x, y) coordinates representing the top-left corner of each text.
+            If None, the texts will be horizontally centered and vertically spaced. Default is None.
+        text_color (tuple, optional): The RGB color of the texts in the format (R, G, B). Each value should be in
+            the range [0, 255]. Default is (255, 255, 255) for white.
+        return_numpy_array (bool, optional): If True, the function will return the resulting image as a numpy array.
+            If False, the function will save the image to the specified output_path or display it using matplotlib.
+            Default is False.
+        font_name: text font. List available font names on the system: fonts = [font.name for font in font_manager.fontManager.ttflist]
+
+    Returns:
+        numpy.ndarray or None: The resulting image as a numpy array if return_numpy_array is True, otherwise None.
+
+    Example:
+        # Overlay multiple texts on an image and save it
+        overlay_texts('input.jpg', ['HELLO', 'WORLD'], 'arial.ttf', font_size=30, output_path='output.jpg',
+                      positions=[(50, 50), (200, 100)], text_color=(255, 0, 0))
+
+        # Overlay multiple texts on a numpy array and display it
+        image_array = np.zeros((200, 200, 3), dtype=np.uint8)
+        overlay_texts(image_array, ['HELLO', 'WORLD'], 'arial.ttf', font_size=30, output_path=None,
+                      positions=[(50, 50), (100, 100)], text_color=(255, 0, 0))
+
+    Note:
+        - The input image can be provided as a file path (str) or as a numpy array.
+        - If the output_path is None and return_numpy_array is False, the function will display the overlaid image using matplotlib.
+          Otherwise, it will save the resulting image to the specified path or return it as a numpy array based on return_numpy_array.
+        - If positions are not provided (None), the texts will be horizontally centered and vertically spaced.
+    """
+
+    # If the input is a file path, load the image
+    if isinstance(image, str):
+        image = Image.open(image)
+    else:
+        # Convert numpy array to PIL Image
+        image = Image.fromarray(image)
+
+    # Convert the input image to RGB mode (if needed) to handle alpha channels
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    # Create a drawing context
+    draw = ImageDraw.Draw(image)
+
+    # Load the font
+    font = font_manager.FontProperties(family=font_name, weight='bold')
+    font_path = font_manager.findfont(font)
+    font = ImageFont.truetype(font_path, font_size)
+
+    # If positions are not provided, calculate them for centered and spaced texts
+    if positions is None:
+        text_height = draw.textsize(texts[0], font)[1]
+        num_texts = len(texts)
+        total_height = num_texts * text_height
+        y_offset = (image.height - total_height) // (num_texts + 1)
+        positions = [(0, y_offset * (i + 1) + i * text_height) for i in range(num_texts)]
+
+    # Overlay each text at its corresponding position
+    for text, position in zip(texts, positions):
+        # Draw the text on the image
+        draw.text(position, text, fill=text_color, font=font)
+
+    # If output_path is provided and return_numpy_array is False, save the image
+    if output_path is not None: # and not return_numpy_array:
+        image.save(output_path)
+    elif return_numpy_array:
+        # If return_numpy_array is True, return the image as a numpy array
+        image_array = np.array(image)
+        image.close()
+        return image_array
+    
+    if display_on_screen:
+        # If display_on_screen is True, display the image using OpenCV
+        image_np = np.array(image)
+        cv2.imshow("Overlayed Image", cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # Close the image
+    image.close()
+
+
+def create_gif_from_images(image_list, output_path, frame_duration=1.0, loop=0):
+    from PIL import Image
+
+    """
+    Convert a list of image numpy arrays and/or image file paths to a GIF file.
+
+    Parameters:
+        image_list (list): List of image numpy arrays and/or image file paths.
+        output_path (str): Path to save the resulting GIF file.
+        frame_duration (int, optional): Display duration of each frame in seconds. Default is 1.0 second.
+        loop (int, optional): Number of loops. 0 means infinite looping. Default is 0.
+    
+    Example usage:
+    # Assuming you have a list of image file paths named "image_list"
+    # and a list of numpy arrays named "numpy_image_list"
+    # Combine both lists into "combined_list"
+    combined_list = ["image1.jpg", "image2.jpg", numpy_array1, numpy_array2]
+    create_gif(combined_list, 'output.gif', frame_duration=2, loop=3)
+        
+    """
+
+    def load_image(image_item):
+        if isinstance(image_item, str):
+            return Image.open(image_item)
+        elif isinstance(image_item, np.ndarray):
+            return Image.fromarray(image_item)
+        else:
+            raise ValueError("Invalid image item. Must be either numpy array or image file path.")
+
+    # Load images from file paths and convert them to Image objects
+    image_list = [load_image(image_item) for image_item in image_list]
+
+    # Save the list of images as frames in the GIF file with custom frame duration
+    image_list[0].save(output_path, save_all=True, append_images=image_list[1:], duration=frame_duration*1000, loop=loop)
+
+
+def create_video_from_images(image_list, output_path, frame_duration=1.0):
+
+    import imageio
+
+    """
+    Convert a list of image numpy arrays and/or image file paths to an MP4 video file.
+
+    Parameters:
+        image_list (list): List of image numpy arrays and/or image file paths.
+        output_path (str): Path to save the resulting MP4 video file.
+        image_duration (float, optional): Duration in seconds to display each image.
+                                          Default is 1.0 second per image.
+
+    Example usage:
+        # Assuming you have a list of image file paths named "image_list"
+        # and a list of numpy arrays named "numpy_image_list"
+        # Combine both lists into "combined_list"
+        combined_list = ["image1.jpg", "image2.jpg", numpy_array1, numpy_array2]
+        create_mp4_from_images(combined_list, 'output.mp4', frame_duration=2.0)
+    """
+
+    def load_image(image_item):
+        if isinstance(image_item, str):
+            return imageio.imread(image_item)
+        elif isinstance(image_item, np.ndarray):
+            return image_item
+        else:
+            raise ValueError("Invalid image item. Must be either numpy array or image file path.")
+
+    # Load images from file paths and convert them to numpy arrays
+    image_list = [load_image(image_item) for image_item in image_list]
+
+    # Calculate the frames per second based on the image_duration
+    fps = 1.0 / frame_duration
+
+    # Write the list of images as frames in the MP4 video file
+    with imageio.get_writer(output_path, fps=fps) as writer:
+        for image_frame in image_list:
+            writer.append_data(image_frame)

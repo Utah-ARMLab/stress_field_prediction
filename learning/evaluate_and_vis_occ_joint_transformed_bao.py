@@ -7,10 +7,10 @@ import timeit
 import sys
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb, read_pickle_data, print_color, export_open3d_object_to_image
+from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb, read_pickle_data, print_color
 from utils.point_cloud_utils import transform_point_cloud
 from utils.stress_utils import *
-from utils.camera_utils import display_images
+from utils.camera_utils import display_images, export_open3d_object_to_image, overlay_texts_on_image, create_gif_from_images, create_video_from_images
 from model import StressNet2
 from copy import deepcopy
 
@@ -25,7 +25,7 @@ start_time = timeit.default_timer()
 visualization = False
 query_type = "sampled"  # options: sampled, full
 num_pts = 1024
-num_query_pts = 10000
+num_query_pts = 1000
 # stress_visualization_min = 0.001   
 # stress_visualization_max = 5e3 
 # log_stress_visualization_min = np.log(stress_visualization_min)   
@@ -172,11 +172,18 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
             pcd_gts.append(pcd_gt)
             
             image = export_open3d_object_to_image([pcd], image_path=None, img_resolution=[500,500])
-            images.append(image)
+            # images.append(image)
+
+            overlaid_image = overlay_texts_on_image(image, texts=[f"{young_modulus*10:.0f} kPa - {force:.1f} N"], 
+                                                    font_size=30, positions=[(0,0)], return_numpy_array=True, display_on_screen=False)
+            # print(overlaid_image.shape)
+            images.append(overlaid_image)
                
             # break
 
-        display_images(images, num_columns=4, output_file=None)
+        create_gif_from_images(images, output_path="/home/baothach/Downloads/test.gif", frame_duration=2000)
+        create_video_from_images(images, output_path="/home/baothach/Downloads/test.gif", fps=1/2.)
+        # display_images(images, num_columns=4, output_file=None)
 
         # for i, pcd in enumerate(pcds):
         #     pcd.translate((0.0,0.06*(i),0))

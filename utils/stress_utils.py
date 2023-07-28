@@ -37,22 +37,29 @@ def compute_von_mises_stress(cauchy_tensor):
 
 def compute_stress_each_vertex(tet_stress, adjacent_tetrahedral_dict, vertex_idx):
     """
+    Compute scalar stress value at each vertex by averaging stress values at all adjacent tetrahedral elements.  
+
     The stress tensor at each vertex is calculated by averaging
-    the stress tensors at all adjacent tetrahedral elements. Each stress tensor is
-    then converted to the scalar von Mises stress (i.e., the second
+    the stress tensors at all adjacent tetrahedral elements. The average stress tensor is
+    then converted to a scalar von Mises stress (i.e., the second
     invariant of the deviatoric stress), which is widely used to
     quantify whether a material has yielded.     
 
     tet_stress: shape (num_tetrahedra, 3, 3). Cauchy stress tensors (3,3) at each tetrahedron.
-    """
-    avg_cauchy_stress_tensor = np.zeros((3,3))
-    for tetrahedra_idx in adjacent_tetrahedral_dict[vertex_idx]:    # iterate through each of tetrahedron that contains vertex_idx    
-        
-        avg_cauchy_stress_tensor += tet_stress[tetrahedra_idx]
-
-    avg_cauchy_stress_tensor /= len(adjacent_tetrahedral_dict[vertex_idx])  # average out over all all adjacent tetrahedras
+    von_mises_stress: scalar stress value at vertex_idx
     
-    von_mises_stress = compute_von_mises_stress(avg_cauchy_stress_tensor)   # convert 3x3 mat to a scalar
+    """
+    
+    # avg_cauchy_stress_tensor = np.zeros((3,3))
+    # for tetrahedra_idx in adjacent_tetrahedral_dict[vertex_idx]:    # iterate through each of tetrahedron that contains vertex_idx    
+        
+    #     avg_cauchy_stress_tensor += tet_stress[tetrahedra_idx]
+
+    # avg_cauchy_stress_tensor /= len(adjacent_tetrahedral_dict[vertex_idx])  # average out over all all adjacent tetrahedras
+    
+    avg_cauchy_stress_tensor = np.mean(tet_stress[adjacent_tetrahedral_dict[vertex_idx]], axis=0)   # average out over all all adjacent tetrahedras. Shape (3,3).     
+    von_mises_stress = compute_von_mises_stress(avg_cauchy_stress_tensor)   # convert 3x3 mat to a scalar stress value
+    
     return von_mises_stress
 
 

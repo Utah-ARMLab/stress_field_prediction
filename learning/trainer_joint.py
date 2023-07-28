@@ -72,9 +72,9 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
 
-        loss_occ *= 85  # balance the two stress components 65
+        loss_occ *= 65  # balance the two stress components 65 85
         
-        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
+        print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
         
         
@@ -88,7 +88,7 @@ def train(model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(sample), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
             
-            print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
+            print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
             
         
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/6polygon04_exp_2"
+        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
     gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-    object_names = [f"6polygon0{j}" for j in [4]]     # [3,4,5,6,7,8]
+    object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]     # [3,4,5,6,7,8]
 
     # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
@@ -225,15 +225,16 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 200, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 401):
+    for epoch in range(0, 101):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         
         print_color(f"================ Epoch {epoch}")
         print(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins\n")
+        logger.info(f"Time passed: {(timeit.default_timer() - start_time)/60:.2f} mins\n")
         
         train(model, device, train_loader, optimizer, epoch)
         scheduler.step()
