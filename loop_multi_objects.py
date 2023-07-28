@@ -11,7 +11,7 @@ start_time = timeit.default_timer()
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [5,6,7,8]]:
+for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
     for grasp_idx in range(*grasp_idx_bounds):
         # grasp_idx = 9
         print_color(f"===================== Started {object_name} - grasp {grasp_idx}")
@@ -35,4 +35,4 @@ for object_name in [f"6polygon0{j}" for j in [5,6,7,8]]:
 #     print_color(f"Started object {object_name}: {i+1}/{num_objects}")
 #     os.system(f"python3 collect_static_data.py --object={object_name}")
         
-# print_color(f"DONE! You burned {(timeit.default_timer() - start_time)/3600} trees" )
+print_color(f"DONE! You burned {(timeit.default_timer() - start_time)/3600} trees" )

@@ -1195,9 +1195,14 @@ class PandaFsm:
 
                 if self.cfg['data_recording']['is_recording']:
                     data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.recorded_force_count}.pickle")
+                    
+                    force_fingers_joint_angles = [self.franka_dof_states['pos'][-3:][1], 
+                                                    self.franka_dof_states['pos'][-3:][2]]
+                    
                     record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
                                                 self.f_moving_average[-1], self.grasp_pose, 
                                                 self.pre_squeeze_fingers_joint_angles,
+                                                force_fingers_joint_angles,
                                                 self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
                     self.recorded_force_count += 1
 

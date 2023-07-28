@@ -72,7 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
 
-        loss_occ *= 65  # balance the two stress components
+        loss_occ *= 85  # balance the two stress components 65
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
@@ -93,7 +93,7 @@ def train(model, device, train_loader, optimizer, epoch):
         
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
             train_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
-            train_accuracies.append(100.* batch_correct / pc.shape[0])
+            train_accuracies.append(100.* batch_correct / output[0].shape[0])
     
     print('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
@@ -136,7 +136,7 @@ def test(model, device, test_loader, epoch):
             total_occupied_qrs += occupied_idxs.shape[0]
             if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
                 selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
-                loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs], reduction='sum')  # stress loss
+                loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs])  # stress loss
                 test_loss += loss_stress.item()
            
             
@@ -147,7 +147,7 @@ def test(model, device, test_loader, epoch):
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
             test_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
-            test_accuracies.append(100.* batch_correct / pc.shape[0])      
+            test_accuracies.append(100.* batch_correct / output[0].shape[0])      
                             
 
     test_loss /= len(test_loader.dataset)
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/weights/all_6polygon_joint_transformed"
+        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/6polygon04_exp_2"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -185,18 +185,18 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
-    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-    object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]     # [3,4,5,6,7,8]
+    object_names = [f"6polygon0{j}" for j in [4]]     # [3,4,5,6,7,8]
 
     # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
     dataset_size = len(dataset)
-    batch_size = 30     # 30     
+    batch_size = 250     # 30     
     
     train_len = round(dataset_size*0.9)
-    test_len = round(dataset_size*0.1)-1
+    test_len = round(dataset_size*0.1)
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap
@@ -225,10 +225,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 200, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 101):
+    for epoch in range(0, 401):
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         
@@ -246,5 +246,13 @@ if __name__ == "__main__":
                 "train_accuracies": train_accuracies, "test_accuracies": test_accuracies} 
         with open(os.path.join(weight_path, f"saved_losses_accuracies.pickle"), 'wb') as handle:
             pickle.dump(saved_data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+            
+            
+""" 
+Training tips:
+1) Final (train) average stress loss must be around 0.1~0.2
+2) Occupancy accuracy (for both train and test) must be >= 94%. Sometimes it has to reach ~98% in order for the model to work.
+
+"""
             
         

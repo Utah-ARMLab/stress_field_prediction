@@ -22,27 +22,28 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 # gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
 # os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
-data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/all_6polygon_data_new"
+data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
+data_recording_path = os.path.join(data_main_path, "all_6polygon_data")
 # data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
 # os.makedirs(data_processed_path, exist_ok=True)
 
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = False
+process_gripper_only = True
 num_pts = 1024
 num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [8]]:
+for object_name in [f"6polygon0{j}" for j in [4]]:
 
     if not process_gripper_only:
-        data_processed_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/processed_data_{object_name}"
+        data_processed_path = os.path.join(data_main_path,  f"processed_data_{object_name}")       
         os.makedirs(data_processed_path, exist_ok=True)
         data_point_count = len(os.listdir(data_processed_path))
-    gripper_pc_recording_path = f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/gripper_data_{object_name}"
+    gripper_pc_recording_path = os.path.join(data_main_path,  f"gripper_data_{object_name}") 
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 

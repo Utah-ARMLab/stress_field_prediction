@@ -97,8 +97,14 @@ def get_object_particle_state(gym, sim, vis=False):
 #         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
 def record_data_stress_prediction(data_recording_path, gym, sim, 
-                                current_force, grasp_pose, fingers_joint_angles, 
+                                current_force, grasp_pose, fingers_joint_angles, force_fingers_joint_angles, 
                                 object_name, young_modulus, object_scale):
+    
+    """
+    Record data to pickle files.
+    fingers_joint_angles: gripper's joint angles RIGHT AFTER making contact with the object (not applying force yet). Shape (2,)
+    force_fingers_joint_angles: gripper's joint angles when gripper is APPLYING FORCE to the object. Shape (2,)
+    """
                                     
     ### Get current object particle state:
     object_particle_state = get_object_particle_state(gym, sim)
@@ -116,6 +122,7 @@ def record_data_stress_prediction(data_recording_path, gym, sim,
        
     data = {"object_particle_state": object_particle_state, "force": current_force, 
         "grasp_pose": grasp_pose, "fingers_joint_angles": fingers_joint_angles, 
+        "force_fingers_joint_angles": force_fingers_joint_angles,
         "tet_stress": all_cauchy_stresses, 
         "object_name": object_name, "young_modulus": young_modulus, "object_scale": object_scale}    
     
@@ -209,3 +216,21 @@ def sample_points_from_tet_mesh(mesh, k):
     sampled_points = np.concatenate((points), axis=0)
 
     return sampled_points
+
+def read_youngs_value_from_urdf(urdf_file):
+    import xml.etree.ElementTree as ET
+    
+    tree = ET.parse(urdf_file)
+    root = tree.getroot()
+
+    youngs_elem = root.find('.//fem/youngs')
+    if youngs_elem is not None and 'value' in youngs_elem.attrib:
+        return str(float(youngs_elem.attrib['value']))
+
+    return None
+
+def export_open3d_object_to_image(open3d_object, img_resolution):
+    """
+    Export open3d point cloud and mesh scene to an image in Open3D.
+    Don't have to manually screenshot anymore.
+    """

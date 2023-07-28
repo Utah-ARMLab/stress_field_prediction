@@ -32,7 +32,7 @@ from scipy.spatial.transform import Rotation as R
 from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
-from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color 
+from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, read_youngs_value_from_urdf
 from utils.camera_utils import *
 from isaacgym import gymtorch
 import pickle
@@ -57,7 +57,7 @@ class GraspEvaluator:
         self.grasp_ind = grasp_ind
         self.oris = oris  # Array of [ori_start, ori_end]
         self.density = density
-        self.youngs = youngs
+        # self.youngs = youngs
         self.poissons = poissons
         self.friction = float(friction)
         self.mode = mode.lower()
@@ -77,6 +77,9 @@ class GraspEvaluator:
         os.makedirs(self.data_recording_path, exist_ok=True)
         
         self.object_path = os.path.join(self.assets_dir, self.object_name)
+        self.youngs = read_youngs_value_from_urdf(os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf"))
+        print_color(f"self.youngs: {self.youngs}")
+        
         self.tag = tag
 
         # Load candidate grasp and initialize results folder
@@ -227,7 +230,8 @@ class GraspEvaluator:
 
         # Load Franka and object assets
         asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
-        asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
+        # asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
+        asset_file_object = os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf")
 
 
         # Set asset options
@@ -402,8 +406,8 @@ class GraspEvaluator:
 
             object_height_buffer = 0.001
 
-            pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up
-
+            # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
+            # print_color(f"{pose.p}")
             object_handle = self.gym.create_actor(env_handle, self.asset_handle_object, pose,
                                                   f"object_{i}", collision_group,
                                                   collision_filter)
@@ -411,8 +415,10 @@ class GraspEvaluator:
 
             # Create platform
             height_of_platform = 0.005
+            # pose.p.z -= (height_of_platform + object_height_buffer +
+            #              + 0.5 * height_of_object)  # fix z_up
             pose.p.z -= (height_of_platform + object_height_buffer +
-                         + 0.5 * height_of_object)  # fix z_up
+                         + 0.5 * height_of_object) + (self.cfg['sim_params']['platform_height'] + object_height_buffer) # fix z_up
 
             if self.mode == "squeeze_no_gravity":
                 pose.p.y = 0.5

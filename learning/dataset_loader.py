@@ -114,18 +114,22 @@ class StressPredictionObjectFrameDataset(Dataset):
         return len(self.file_names)
 
     def __getitem__(self, idx):   
+        
+        num_partial_pc = 1  # 8
 
         query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, self.file_names[idx]))  # shape (B, 3)
         object_name = query_data["object_name"]
         grasp_idx = query_data["grasp_idx"]
         force = query_data["force"]
-        young_modulus = query_data["young_modulus"]
+        # young_modulus = query_data["young_modulus"]
+        young_modulus = np.exp(query_data["young_modulus"])/1e4
+        # print("young_modulus", young_modulus)
         
         ### Load robot gripper point cloud
         gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 
-                                    f"{object_name}_grasp_{grasp_idx}.pickle"))["transformed_gripper_pcs"]   # shape (8, num_pts, 3)
+                                    f"{object_name}_grasp_{grasp_idx}.pickle"))["transformed_gripper_pcs"][0:num_partial_pc]   # shape (8, num_pts, 3)
         augmented_gripper_pcs = np.concatenate([gripper_pcs, np.tile(np.array([[0, 0]]), 
-                                                (8, gripper_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)        
+                                                (num_partial_pc, gripper_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)        
         
 
         ### Load partial-view object point clouds   
@@ -134,9 +138,9 @@ class StressPredictionObjectFrameDataset(Dataset):
         static_data = read_pickle_data(data_path=os.path.join(self.object_partial_pc_path, 
                                         f"{object_name}.pickle"))
         homo_mats = static_data["homo_mats"]    # list of 8 4x4 homo transformation matrices
-        partial_pcs = static_data["transformed_partial_pcs"]   # shape (8, num_pts, 3)
+        partial_pcs = static_data["transformed_partial_pcs"][0:num_partial_pc]   # shape (8, num_pts, 3)
         augmented_partial_pcs = np.concatenate([partial_pcs, np.tile(np.array([[force, young_modulus]]), 
-                                                (8, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
+                                                (num_partial_pc, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
 
         
         ### Combine object pc and gripper pc
@@ -147,7 +151,7 @@ class StressPredictionObjectFrameDataset(Dataset):
 
         ### Duplicate query points, stress, and occupancy to accomodate 8 partial-view point clouds (from 8 different camera angles)
         transformed_qrs = []
-        for i in range(8):
+        for i in range(num_partial_pc):
             transformed_qrs.append(transform_point_cloud(query_data["query_points"], homo_mats[i])[np.newaxis, :])     
         transformed_qrs = np.concatenate(tuple(transformed_qrs), axis=0)  
         query = torch.from_numpy(transformed_qrs).float()  # shape (B, 8, num_queries, 3)
@@ -155,10 +159,10 @@ class StressPredictionObjectFrameDataset(Dataset):
 
         if self.joint_training:
             stress_log = torch.FloatTensor([query_data["stress_log"]])  # shape (B, 1, num_queries) FIX        
-            stress_log = stress_log.repeat(8,1)  # shape (B, 8, num_queries)
+            stress_log = stress_log.repeat(num_partial_pc,1)  # shape (B, 8, num_queries)
 
         occupancy = torch.tensor(query_data["occupancy"]).float()  # shape (B, num_queries) FIX
-        occupancy = occupancy.unsqueeze(0).repeat(8,1)  # shape (B, 8, num_queries)
+        occupancy = occupancy.unsqueeze(0).repeat(num_partial_pc,1)  # shape (B, 8, num_queries)
         
         if self.joint_training:
             sample = {"pc": pc, "query":  query,  "stress": stress_log, "occupancy": occupancy}   
