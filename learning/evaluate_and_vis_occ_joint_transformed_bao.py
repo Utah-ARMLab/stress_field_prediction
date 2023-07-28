@@ -7,10 +7,10 @@ import timeit
 import sys
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, down_sampling, scalar_to_rgb, read_pickle_data, print_color
+from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb, read_pickle_data, print_color, export_open3d_object_to_image
 from utils.point_cloud_utils import transform_point_cloud
 from utils.stress_utils import *
-from utils.constants import OBJECT_NAMES
+from utils.camera_utils import display_images
 from model import StressNet2
 from copy import deepcopy
 
@@ -25,7 +25,7 @@ start_time = timeit.default_timer()
 visualization = False
 query_type = "sampled"  # options: sampled, full
 num_pts = 1024
-num_query_pts = 100000
+num_query_pts = 10000
 # stress_visualization_min = 0.001   
 # stress_visualization_max = 5e3 
 # log_stress_visualization_min = np.log(stress_visualization_min)   
@@ -96,9 +96,10 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
 
         pcds = []
         pcd_gts = []
+        images = []
 
-        for force_idx in [30]:
-        # for force_idx in range(20,61):
+        # for force_idx in [30]:
+        for force_idx in range(0,25,5):
             
             print(f"{object_name} - grasp {k} - force {force_idx} started")
             
@@ -114,7 +115,7 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
             
             full_pc = data["object_particle_state"]
             force = data["force"] 
-            force = 7    
+            # force = 7    
             print(f"force: {force:.2f}") 
             
             # young_modulus = np.log(float(data["young_modulus"]))
@@ -125,7 +126,7 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
 
             young_modulus = float(data["young_modulus"])/1e4
             # print(float(data["young_modulus"]))
-            young_modulus = 2
+            # young_modulus = 2
             print(f"young_modulus: {young_modulus:.3f}")
             
             tet_stress = data["tet_stress"]
@@ -169,41 +170,13 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
 
             pcds.append(pcd)
             pcd_gts.append(pcd_gt)
-
-            vis = open3d.visualization.Visualizer()
-            vis.create_window(visible=True, width=600, height=600) #works for me with False, on some systems needs to be true
-            vis.add_geometry(pcd)
-            # vis.update_geometry(pcd)
-
-            # Get the view control
-            view_control = vis.get_view_control()
-
-            # Set the default view control parameters
-            front = [0.0, 0.0, 1.0]  # Camera direction (default is [0, 0, -1])
-            lookat = [0.0, 0.0, 0.0]  # Camera target point (default is [0, 0, 0])
-            view_control.set_front(front)
-            view_control.set_lookat(lookat)
-
-
-            vis.poll_events()
-            vis.update_renderer()
-            vis.capture_screen_image("/home/baothach/Downloads/point_cloud_image.png")
-            vis.destroy_window()
             
-            # # Create a visualization object and add the point cloud
-            # vis = open3d.visualization.Visualizer()
-            # vis.create_window()
-            # vis.add_geometry(pcd)
-
-            # # Capture the rendered image and save it to a file
-            # image = vis.capture_screen_float_buffer()
-            # open3d.io.write_image("/home/baothach/Downloads/point_cloud_image.png", image)       
-           
-            # # Close the visualization window
-            # vis.destroy_window()
-                       
-            
+            image = export_open3d_object_to_image([pcd], image_path=None, img_resolution=[500,500])
+            images.append(image)
+               
             # break
+
+        display_images(images, num_columns=4, output_file=None)
 
         # for i, pcd in enumerate(pcds):
         #     pcd.translate((0.0,0.06*(i),0))

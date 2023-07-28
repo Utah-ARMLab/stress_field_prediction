@@ -159,6 +159,11 @@ def display_images(images, num_columns=4, output_file=None):
     images: a list of torch tensor images, shape (3,H,W).
     
     """
+    
+    if not isinstance(images[0], torch.Tensor):
+        # Convert the images to a PyTorch tensor
+        torch_images = [torch.from_numpy(image).permute(2,0,1) for image in images]
+        images = torch_images
 
     # num_images = len(images)   
     Grid = make_grid(images, nrow=num_columns, padding=0)

@@ -229,8 +229,43 @@ def read_youngs_value_from_urdf(urdf_file):
 
     return None
 
-def export_open3d_object_to_image(open3d_object, img_resolution):
+def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[500,500], cam_position=[0.0, 0.0, 1.0], cam_target=[0, 0, 0]):
     """
-    Export open3d point cloud and mesh scene to an image in Open3D.
-    Don't have to manually screenshot anymore.
+    Export open3d objects (point cloud, mesh, etc.) scene to an image. Don't have to manually screenshot anymore.
+    
+    open3d_objects (list): open3d point cloud, mesh, etc.
+    image_path: path to save the screenshot to. If None, return the image as a NumPy array instead of saving it to a file.
+    img_resolution: resolution of the screenshot image. Ex: [600,600]
+    cam_position: camera direction. Ex: [0.0, 0.0, 1.0]
+    cam_target: camera target point. Ex: [0.0, 0.0, 0.0]
+    
     """
+
+    vis = open3d.visualization.Visualizer()
+    vis.create_window(visible=True, width=img_resolution[0], height=img_resolution[1]) # works for me with True, on some systems needs to be False
+    for open3d_object in open3d_objects:
+        vis.add_geometry(open3d_object)
+    # vis.update_geometry(pcd)
+
+
+    ### Change viewing angle for the screenshot
+    view_control = vis.get_view_control()
+    front = cam_position  # Camera direction (default is [0, 0, -1])
+    lookat = cam_target  # Camera target point (default is [0, 0, 0])
+    view_control.set_front(front)
+    view_control.set_lookat(lookat)
+
+
+    vis.poll_events()
+    vis.update_renderer()
+    
+    if image_path is None:  # return the image as a NumPy array instead of saving it to a file
+        image = np.asarray(vis.capture_screen_float_buffer(True))   # get the image as a np array 
+        vis.destroy_window()
+        image = (image * 255).astype(np.uint8)  # Normalize the image array to [0, 255] and convert to uint8 type        
+        return image
+        
+    else:    
+        vis.capture_screen_image(image_path)
+        vis.destroy_window()    
+    
