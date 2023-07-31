@@ -8,9 +8,9 @@ poissons = 0.3
 attach_dist = 0.0
 scale = 1
 
-for object_name in OBJECT_NAMES[4:]:
+for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:
 
-    object_urdf_path = f"../sim_data/stress_prediction_data/objects/{object_name}"
+    object_urdf_path = f"../sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/{object_name}"
 
     os.makedirs(object_urdf_path,exist_ok=True)
  

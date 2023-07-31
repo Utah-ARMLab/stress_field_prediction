@@ -5,65 +5,64 @@ import pickle
 import random
 import open3d
 from copy import deepcopy
-from constants import OBJECT_NAMES
-
-def create_tet(mesh_dir, object_name):
-    # STL to mesh
-    import os
-    os.chdir('/home/baothach/fTetWild/build') 
-    mesh_path = os.path.join(mesh_dir, object_name+'.obj')
-    save_fTetwild_mesh_path = os.path.join(mesh_dir, object_name + '.mesh')
-    os.system("./FloatTetwild_bin -o " + save_fTetwild_mesh_path + " -i " + mesh_path + " --coarsen >/dev/null")
+import sys
+sys.path.append("../")
+from utils.mesh_utils import create_tet_mesh, simplify_mesh
+import pymeshlab as ml
 
 
-    # Mesh to tet:
-    mesh_file = open(os.path.join(mesh_dir, object_name + '.mesh'), "r")
-    tet_output = open(
-        os.path.join(mesh_dir, object_name + '.tet'), "w")
 
-    # Parse .mesh file
-    mesh_lines = list(mesh_file)
-    mesh_lines = [line.strip('\n') for line in mesh_lines]
-    vertices_start = mesh_lines.index('Vertices')
-    num_vertices = mesh_lines[vertices_start + 1]
+box_dataset_geometries = \
+[(0.07, 0.05, 0.045),
+(0.07, 0.07, 0.06),
+(0.07, 0.035, 0.025),
+(0.06, 0.045, 0.035),
+(0.03, 0.15, 0.03),
+(0.07, 0.15, 0.045),
+(0.05, 0.20, 0.06)]
 
-    vertices = mesh_lines[vertices_start + 2:vertices_start + 2
-                        + int(num_vertices)]
+visualization = False
+export_mesh = True
+mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness"
 
-    tetrahedra_start = mesh_lines.index('Tetrahedra')
-    num_tetrahedra = mesh_lines[tetrahedra_start + 1]
-    tetrahedra = mesh_lines[tetrahedra_start + 2:tetrahedra_start + 2
-                            + int(num_tetrahedra)]
+for i, geometry in enumerate(box_dataset_geometries[:1]):
 
-    print("# Vertices, # Tetrahedra:", num_vertices, num_tetrahedra)
-
-    # Write to tet output
-    tet_output.write("# Tetrahedral mesh generated using\n\n")
-    tet_output.write("# " + num_vertices + " vertices\n")
-    for v in vertices:
-        tet_output.write("v " + v + "\n")
-    tet_output.write("\n")
-    tet_output.write("# " + num_tetrahedra + " tetrahedra\n")
-    for t in tetrahedra:
-        line = t.split(' 0')[0]
-        line = line.split(" ")
-        line = [str(int(k) - 1) for k in line]
-        l_text = ' '.join(line)
-        tet_output.write("t " + l_text + "\n")
-
-visualization = True
-mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/objects"
-
-for obj_name in OBJECT_NAMES[4:]:
+    obj_name = f"box0{i+1}"
+    print(f"object name: {obj_name}")
+    
+    mesh = trimesh.creation.box(geometry)
+    # print(mesh.vertices.shape, mesh.faces.shape)
+    
+    # pymeshlab_mesh = ml.Mesh(mesh.vertices, mesh.faces)
+    # mesh = trimesh.Trimesh(vertices=pymeshlab_mesh.vertex_matrix(), faces=pymeshlab_mesh.face_matrix())
+    # print(mesh.vertices.shape, mesh.faces.shape)
+    
     mesh_dir = os.path.join(mesh_main_path, obj_name)
-    os.makedirs(mesh_dir, exist_ok=True)
-       
+    os.makedirs(mesh_dir, exist_ok=True)    
+    save_mesh_fname = os.path.join(mesh_dir, f"{obj_name}.stl")    
+    
+    if export_mesh:
+        mesh.export(save_mesh_fname)        
+        create_tet_mesh(mesh_dir, obj_name, coarsen=True, verbose=True)
+    
     if visualization:
-        fname_object = os.path.join(mesh_dir, f"{obj_name}.obj")
-        mesh = trimesh.load(fname_object)
         mesh.show()
         
-    create_tet(mesh_dir, obj_name)
+    # if i >= 5:
+    #     break
+
+
+
+# for obj_name in OBJECT_NAMES[4:]:
+#     mesh_dir = os.path.join(mesh_main_path, obj_name)
+#     os.makedirs(mesh_dir, exist_ok=True)
+       
+#     if visualization:
+#         fname_object = os.path.join(mesh_dir, f"{obj_name}.obj")
+#         mesh = trimesh.load(fname_object)
+#         mesh.show()
+        
+#     create_tet_mesh(mesh_dir, obj_name)
     
 
 

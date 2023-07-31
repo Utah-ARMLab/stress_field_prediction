@@ -123,7 +123,7 @@ class StressPredictionObjectFrameDataset(Dataset):
         force = query_data["force"]
         # young_modulus = query_data["young_modulus"]
         young_modulus = query_data["young_modulus"]/1e4
-        print("young_modulus", young_modulus)
+        # print("young_modulus", young_modulus)
         
         ### Load robot gripper point cloud
         gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 

@@ -9,7 +9,7 @@ attach_dist = 0.0
 scale = 1
 youngs_bounds = np.log([1e4, 5e5])
 
-for object_name in [f"6polygon0{j}" for j in [3,5,6,7,8]]:
+for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:  # 1,2,3,4,5,6,7,8
 
     object_urdf_path = f"../sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/{object_name}"
 

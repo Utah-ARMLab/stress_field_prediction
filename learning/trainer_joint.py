@@ -72,9 +72,9 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
 
-        loss_occ *= 65  # balance the two stress components 65 85
+        loss_occ *= 70  # balance the two stress components 65 85
         
-        print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
+        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
         
         
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
     dataset_size = len(dataset)
-    batch_size = 250     # 30     
+    batch_size = 30     # 30   250     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)

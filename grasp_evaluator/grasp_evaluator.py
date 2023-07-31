@@ -73,6 +73,9 @@ class GraspEvaluator:
         self.franka_urdf = os.path.join(sim_data_main_path, self.cfg['dir']['franka_urdf'])
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
+        
+        prim_name = self.object_name.split('0')[0]
+        self.data_recording_path = os.path.join(self.data_recording_path, f"all_{prim_name}_data") 
         # print_color(self.data_recording_path)
         os.makedirs(self.data_recording_path, exist_ok=True)
         

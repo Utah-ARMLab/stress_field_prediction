@@ -185,7 +185,7 @@ def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], o
 
     for cam_handle in cam_handles:
         image = gym.get_camera_image(sim, env, cam_handle, gymapi.IMAGE_COLOR).reshape((resolution[0],resolution[1],4))[:,:,:3]
-        print(image.shape)
+        # print(image.shape)
         images.append(torch.from_numpy(image).permute(2,0,1) )
 
     display_images(images, output_file=output_file)
@@ -312,7 +312,15 @@ def overlay_texts_on_image(image, texts, font_size=20, output_path=None, display
         # Draw the text on the image
         draw.text(position, text, fill=text_color, font=font)
 
-    # If output_path is provided and return_numpy_array is False, save the image
+
+    if display_on_screen:
+        # If display_on_screen is True, display the image using OpenCV
+        image_np = np.array(image)
+        cv2.imshow("Overlayed Image", cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    # If output_path is provided
     if output_path is not None: # and not return_numpy_array:
         image.save(output_path)
     elif return_numpy_array:
@@ -321,36 +329,35 @@ def overlay_texts_on_image(image, texts, font_size=20, output_path=None, display
         image.close()
         return image_array
     
-    if display_on_screen:
-        # If display_on_screen is True, display the image using OpenCV
-        image_np = np.array(image)
-        cv2.imshow("Overlayed Image", cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR))
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
 
     # Close the image
     image.close()
 
 
-def create_gif_from_images(image_list, output_path, frame_duration=1.0, loop=0):
+def create_media_from_images(image_list, output_path, frame_duration=1.0, output_format='gif', loop=0):
+
     from PIL import Image
+    import imageio
 
     """
-    Convert a list of image numpy arrays and/or image file paths to a GIF file.
+    Convert a list of image numpy arrays and/or image file paths to a GIF or MP4 file.
 
     Parameters:
         image_list (list): List of image numpy arrays and/or image file paths.
-        output_path (str): Path to save the resulting GIF file.
-        frame_duration (int, optional): Display duration of each frame in seconds. Default is 1.0 second.
-        loop (int, optional): Number of loops. 0 means infinite looping. Default is 0.
-    
+        output_path (str): Path to save the resulting file.
+        frame_duration (float, optional): Display duration of each frame in seconds. Default is 1.0 second.
+        output_format (str, optional): Output format, either 'gif' or 'mp4'. Default is 'gif'.
+        loop (int, optional): Number of loops for GIF. 0 means infinite looping. Default is 0.
+
     Example usage:
-    # Assuming you have a list of image file paths named "image_list"
-    # and a list of numpy arrays named "numpy_image_list"
-    # Combine both lists into "combined_list"
-    combined_list = ["image1.jpg", "image2.jpg", numpy_array1, numpy_array2]
-    create_gif(combined_list, 'output.gif', frame_duration=2, loop=3)
-        
+        # Assuming you have a list of image file paths named "image_list"
+        # and a list of numpy arrays named "numpy_image_list"
+        # Combine both lists into "combined_list"
+        combined_list = ["image1.jpg", "image2.jpg", numpy_array1, numpy_array2]
+        create_media_from_images(combined_list, 'output.gif', frame_duration=2.0, output_format='gif')
+
+        # To create an MP4 video
+        create_media_from_images(combined_list, 'output.mp4', frame_duration=1.0, output_format='mp4')
     """
 
     def load_image(image_item):
@@ -361,49 +368,19 @@ def create_gif_from_images(image_list, output_path, frame_duration=1.0, loop=0):
         else:
             raise ValueError("Invalid image item. Must be either numpy array or image file path.")
 
-    # Load images from file paths and convert them to Image objects
+    # Load images from file paths and convert them to Image objects or numpy arrays
     image_list = [load_image(image_item) for image_item in image_list]
 
-    # Save the list of images as frames in the GIF file with custom frame duration
-    image_list[0].save(output_path, save_all=True, append_images=image_list[1:], duration=frame_duration*1000, loop=loop)
+    if output_format == 'gif':
+        # Save the list of images as frames in the GIF file with custom frame duration
+        image_list[0].save(output_path, save_all=True, append_images=image_list[1:], duration=frame_duration*1000, loop=loop)
+    elif output_format == 'mp4':
+        # Calculate the frames per second based on the frame_duration
+        fps = 1.0 / frame_duration
 
-
-def create_video_from_images(image_list, output_path, frame_duration=1.0):
-
-    import imageio
-
-    """
-    Convert a list of image numpy arrays and/or image file paths to an MP4 video file.
-
-    Parameters:
-        image_list (list): List of image numpy arrays and/or image file paths.
-        output_path (str): Path to save the resulting MP4 video file.
-        image_duration (float, optional): Duration in seconds to display each image.
-                                          Default is 1.0 second per image.
-
-    Example usage:
-        # Assuming you have a list of image file paths named "image_list"
-        # and a list of numpy arrays named "numpy_image_list"
-        # Combine both lists into "combined_list"
-        combined_list = ["image1.jpg", "image2.jpg", numpy_array1, numpy_array2]
-        create_mp4_from_images(combined_list, 'output.mp4', frame_duration=2.0)
-    """
-
-    def load_image(image_item):
-        if isinstance(image_item, str):
-            return imageio.imread(image_item)
-        elif isinstance(image_item, np.ndarray):
-            return image_item
-        else:
-            raise ValueError("Invalid image item. Must be either numpy array or image file path.")
-
-    # Load images from file paths and convert them to numpy arrays
-    image_list = [load_image(image_item) for image_item in image_list]
-
-    # Calculate the frames per second based on the image_duration
-    fps = 1.0 / frame_duration
-
-    # Write the list of images as frames in the MP4 video file
-    with imageio.get_writer(output_path, fps=fps) as writer:
-        for image_frame in image_list:
-            writer.append_data(image_frame)
+        # Write the list of images as frames in the MP4 video file
+        with imageio.get_writer(output_path, fps=fps) as writer:
+            for image_frame in image_list:
+                writer.append_data(np.array(image_frame))
+    else:
+        raise ValueError("Invalid output format. Supported formats are 'gif' and 'mp4'.")

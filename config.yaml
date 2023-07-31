@@ -17,13 +17,13 @@ force_control:
   min_torque: -0.05
 
 dir:
-  assets_dir: dgn_dataset_varying_stiffness  #'objects' dgn_dataset
+  assets_dir: dgn_dataset_varying_stiffness  #'objects' dgn_dataset dgn_dataset_varying_stiffness
   franka_urdf: 'franka_description/robots/franka_panda_fem_simple_v4_with_arm.urdf'
   results_dir: 'results' 
 
 data_recording:
   is_recording: True
-  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/all_6polygon_data'
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives'
 
 miscellaneous:
   force_debug: False

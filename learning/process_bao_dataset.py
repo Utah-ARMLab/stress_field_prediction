@@ -23,21 +23,24 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 # os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
-data_recording_path = os.path.join(data_main_path, "all_6polygon_data")
+# data_recording_path = os.path.join(data_main_path, "all_6polygon_data")
+data_recording_path = os.path.join(data_main_path, "unseen_6polygons")
 # data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
 # os.makedirs(data_processed_path, exist_ok=True)
 
 # data_point_count = len(os.listdir(data_processed_path))
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = False
+process_gripper_only = True
+save_gripper_data = True
+
 num_pts = 1024
 num_query_pts = 2000
 
 grasp_idx_bounds = [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [3,4,5,6]]:
+for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
 
     if not process_gripper_only:
         data_processed_path = os.path.join(data_main_path,  f"processed_data_{object_name}")       
@@ -62,9 +65,10 @@ for object_name in [f"6polygon0{j}" for j in [3,4,5,6]]:
         
         get_gripper_pc = True
         
+        # for force_idx in [0,30]:
         for force_idx in range(0,61):
             
-            # print(f"{object_name} - grasp {grasp_idx} - force {force} started")
+            # print(f"{object_name} - grasp {grasp_idx} - force {force_idx} started")
             
             file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force_idx}.pickle")
             if not os.path.isfile(file_name):
@@ -80,23 +84,35 @@ for object_name in [f"6polygon0{j}" for j in [3,4,5,6]]:
             object_particle_state = data["object_particle_state"]
             force = data["force"]
             grasp_pose = data["grasp_pose"]
-            fingers_joint_angles = data["fingers_joint_angles"]
-            
-            fingers_joint_angles[0] += 0.005
-            fingers_joint_angles[1] += 0.005
+
 
                 
             if get_gripper_pc:
-                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
-                transformed_gripper_pcs = []
-                for i in range(8):
-                    transformed_gripper_pcs.append(transform_point_cloud(gripper_pc, homo_mats[i])[np.newaxis, :]) 
-                transformed_gripper_pcs = np.concatenate(tuple(transformed_gripper_pcs), axis=0)     
-                # print(transformed_gripper_pcs.shape)  
+                gripper_file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{0}.pickle")
+                                        
+                if not os.path.isfile(gripper_file_name):
+                    break 
+                
+                with open(gripper_file_name, 'rb') as handle:
+                    gripper_data = pickle.load(handle)
+                
+                fingers_joint_angles = gripper_data["force_fingers_joint_angles"]   
+                fingers_joint_angles = fingers_joint_angles[::-1]             
+                fingers_joint_angles[0] += 0.005
+                fingers_joint_angles[1] += 0.005
 
-                gripper_data = {"gripper_pc": gripper_pc, "transformed_gripper_pcs": transformed_gripper_pcs}
-                save_path = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{grasp_idx}.pickle")
-                write_pickle_data(gripper_data, save_path)
+                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
+                
+                if save_gripper_data:
+                    transformed_gripper_pcs = []
+                    for i in range(8):
+                        transformed_gripper_pcs.append(transform_point_cloud(gripper_pc, homo_mats[i])[np.newaxis, :]) 
+                    transformed_gripper_pcs = np.concatenate(tuple(transformed_gripper_pcs), axis=0)     
+                    # print(transformed_gripper_pcs.shape)  
+
+                    gripper_data = {"gripper_pc": gripper_pc, "transformed_gripper_pcs": transformed_gripper_pcs}
+                    save_path = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{grasp_idx}.pickle")
+                    write_pickle_data(gripper_data, save_path)
                 
                 get_gripper_pc = False
             
@@ -178,6 +194,20 @@ for object_name in [f"6polygon0{j}" for j in [3,4,5,6]]:
             # pcd_full = pcd_ize(full_pc, color=[0,0,0], vis=False)
             # pcd_query_outside = pcd_ize(query_points_outside, color=[1,0,0], vis=False) 
             # open3d.visualization.draw_geometries([pcd_query_outside, pcd_query_inside.translate((0.07,0,0)), pcd_full])                
+
+
+            # pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
+            # force_fingers_joint_angles = data["force_fingers_joint_angles"]   
+            # force_fingers_joint_angles = force_fingers_joint_angles[::-1]         
+            # force_fingers_joint_angles[0] += 0.005
+            # force_fingers_joint_angles[1] += 0.005
+            # force_gripper_pc = get_gripper_point_cloud(grasp_pose, force_fingers_joint_angles, num_pts=num_pts)            
+            # # partial_pcs = static_data["partial_pcs"][0]#.reshape(-1,3)
+            # # pcd_partial = pcd_ize(partial_pcs, color=[0,1,0])
+            # pcd_gripper_force = pcd_ize(force_gripper_pc, color=[1,0,0])
+            
+            # pcd = pcd_ize(full_pc, color=[0,0,0])
+            # open3d.visualization.draw_geometries([pcd, pcd_gripper, pcd_gripper_force]) 
 
 
             # break

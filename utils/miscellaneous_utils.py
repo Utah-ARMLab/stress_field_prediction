@@ -49,6 +49,9 @@ def down_sampling(pc, num_pts=1024, return_indices=False):
 
 
 def pcd_ize(pc, color=None, vis=False):
+    """ 
+    Convert point cloud numpy array to an open3d object (usually for visualization purpose).
+    """
     pcd = open3d.geometry.PointCloud()
     pcd.points = open3d.utility.Vector3dVector(pc)   
     if color is not None:
@@ -65,7 +68,7 @@ def get_object_particle_state(gym, sim, vis=False):
     particles = particle_state_tensor.numpy()[:, :3]  
     
     if vis:
-        pcd_ize(particles,vis=True)
+        pcd_ize(particles, vis=True)
     
     return particles.astype('float32')
 
@@ -104,6 +107,7 @@ def record_data_stress_prediction(data_recording_path, gym, sim,
     Record data to pickle files.
     fingers_joint_angles: gripper's joint angles RIGHT AFTER making contact with the object (not applying force yet). Shape (2,)
     force_fingers_joint_angles: gripper's joint angles when gripper is APPLYING FORCE to the object. Shape (2,)
+    
     """
                                     
     ### Get current object particle state:
@@ -174,48 +178,10 @@ def read_pickle_data(data_path):
     with open(data_path, 'rb') as handle:
         return pickle.load(handle)      
 
-
 def write_pickle_data(data, data_path):
     with open(data_path, 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)    
-
-
-def generate_random_weights(k):
-    # Generate random weights for k points
-    weights = np.random.rand(k, 4)
-    # Normalize the weights so that they sum up to 1 for each point
-    normalized_weights = weights / np.sum(weights, axis=1, keepdims=True)
-    return normalized_weights
-
-def compute_weighted_average(vertices, weights):
-    # Compute the weighted average for each set of weights and vertices
-    return np.einsum('ijk,ij->ik', vertices, weights)
-
-def sample_points_from_tet_mesh(mesh, k):
-
-    """ 
-    Sample points from the tetrahedral mesh by executing the following procedure:
-    1) Sampling k points from each tetrahedron by computing the weighted average location of the 4 vertices with random weights
-    
-    """
-
-    num_tetrahedra = mesh.shape[0]
-    vertices = mesh.reshape(num_tetrahedra, 4, -1)
-
-    points = []
-
-    for _ in range(k):
-        # Generate random weights for all tetrahedra and points at once
-        weights_list = generate_random_weights(k=1)
-
-        # Compute the weighted average location for all points and vertices
-        sampled_points = compute_weighted_average(vertices, weights_list)
         
-        points.append(sampled_points)
-        
-    sampled_points = np.concatenate((points), axis=0)
-
-    return sampled_points
 
 def read_youngs_value_from_urdf(urdf_file):
     import xml.etree.ElementTree as ET
@@ -229,5 +195,6 @@ def read_youngs_value_from_urdf(urdf_file):
 
     return None
 
-  
+
+
     

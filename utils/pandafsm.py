@@ -1211,6 +1211,7 @@ class PandaFsm:
                 if self.curr_recording_force > 15:
                     self.state = "done"
                               
+                # self.state = "done" # collect unseen objects FIX
 
                 # if self.mode == "reorient":
                 #     assert (self.inferred_rot_force)

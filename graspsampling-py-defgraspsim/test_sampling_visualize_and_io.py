@@ -28,7 +28,7 @@ import trimesh
 import numpy as np
 import os
 import transformations
-np.random.seed(0)
+np.random.seed(2023)
 
 
 def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=50, visualization=False):
@@ -57,7 +57,8 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
 
     ### Instantiate and run sampler (with collision checking)
     if cls_sampler==sampling.AntipodalSampler:
-        sampler = cls_sampler(gripper, object_mesh, number_of_orientations=6) 
+        # sampler = cls_sampler(gripper, object_mesh, number_of_orientations=6) 
+        sampler = cls_sampler(gripper, object_mesh, 0.0, 4) # Antipodal
     else:
         sampler = cls_sampler(gripper, object_mesh)    
     filtered_poses = sampling.collision_free_grasps(gripper, object_mesh, sampler, number_of_grasps, env_mesh=env_mesh)
@@ -68,14 +69,16 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
     
     ### Visualize sampled grasps on a test object.
     if visualization:
-        scene = visualize.create_scene(object_mesh, 'panda', **results)    # add panda gripper and object to the scene
+        # scene = visualize.create_scene(object_mesh, 'panda_tube', **results)    # add panda gripper and object to the scene
 
-        if env_mesh is not None:
-            env_mesh.visual.face_colors = [250, 0, 0, 255]
-            scene.add_geometry(env_mesh)    # add platform to the scene
+        # if env_mesh is not None:
+        #     env_mesh.visual.face_colors = [250, 0, 0, 255]
+        #     scene.add_geometry(env_mesh)    # add platform to the scene
 
-        scene.show()    
-    
+        # scene.show()    
+        
+        scene = visualize.create_scene(object_mesh, 'panda', **results)
+        scene.show()
 
     return results  #, gripper, object_mesh, env_mesh
 
@@ -83,22 +86,25 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
 if __name__ == "__main__":
 
     # fname_object = 'data/objects/banana.obj'
-    obj_name = "mustard_bottle"
-    object_scale = 1
-    # # fname_object = f'/home/baothach/stress_field_prediction/examples/{obj_name}/{obj_name}.obj'
-    # fname_object = f'/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}.stl'
-    # data_recording_path = f"/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}_grasps.h5"
-    
-    mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/objects"
-    fname_object = os.path.join(mesh_main_path, obj_name, f"{obj_name}.obj")
-    data_recording_path = os.path.join(mesh_main_path, obj_name, f"{obj_name}_grasps.h5")
-    
-    grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=3, visualization=True)
-    grasps["object_scale"] = object_scale
-    print("num grasps:", len(grasps["poses"]))
+    for obj_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:  # 1,2,3,4,5,6,7
+        # obj_name = "box06"
+        print(f"object name: {obj_name}")
+        
+        object_scale = 1
+        # # fname_object = f'/home/baothach/stress_field_prediction/examples/{obj_name}/{obj_name}.obj'
+        # fname_object = f'/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}.stl'
+        # data_recording_path = f"/home/baothach/sim_data/stress_prediction_data/objects/{obj_name}/{obj_name}_grasps.h5"
+        
+        mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness"
+        fname_object = os.path.join(mesh_main_path, obj_name, f"{obj_name}.stl")
+        data_recording_path = os.path.join(mesh_main_path, obj_name, f"{obj_name}_grasps.h5")
+        
+        grasps = sample_grasps(fname_object, object_scale, cls_sampler=sampling.AntipodalSampler, number_of_grasps=100, visualization=True)
+        grasps["object_scale"] = object_scale
+        print("num grasps:", len(grasps["poses"]))
 
-    # ### Save sampled grasps to a h5 file.
-    # h5_writer = io.H5Writer(data_recording_path)
-    # h5_writer.write(**grasps)
+        ### Save sampled grasps to a h5 file.
+        h5_writer = io.H5Writer(data_recording_path)
+        h5_writer.write(**grasps)
 
     # AntipodalSampler  SurfaceApproachSampler
