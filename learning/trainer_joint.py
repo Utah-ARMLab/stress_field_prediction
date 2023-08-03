@@ -72,7 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
 
-        loss_occ *= 70  # balance the two stress components 65 85
+        loss_occ *= 65  # balance the two stress components 65 85 70
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon"
+        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -193,7 +193,7 @@ if __name__ == "__main__":
     # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
     dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
     dataset_size = len(dataset)
-    batch_size = 30     # 30   250     
+    batch_size = 250     # 30   250     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)
@@ -225,10 +225,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 101):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
+    for epoch in range(0, 201):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

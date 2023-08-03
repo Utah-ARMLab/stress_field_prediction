@@ -9,9 +9,10 @@ import argparse
 import isaacgym
 sys.path.append("../")
 from utils.process_data_utils import *
-from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_tet_mesh, print_color
+from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, print_color
 from utils.stress_utils import *
 from utils.point_cloud_utils import transform_point_cloud
+from utils.mesh_utils import sample_points_from_tet_mesh
 from utils.constants import OBJECT_NAMES
 
 """ 
@@ -46,7 +47,8 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
         data_processed_path = os.path.join(data_main_path,  f"processed_data_{object_name}")       
         os.makedirs(data_processed_path, exist_ok=True)
         data_point_count = len(os.listdir(data_processed_path))
-    gripper_pc_recording_path = os.path.join(data_main_path,  f"gripper_data_{object_name}") 
+    # gripper_pc_recording_path = os.path.join(data_main_path,  f"gripper_data_{object_name}")
+    gripper_pc_recording_path = os.path.join(data_main_path,  f"open_gripper_data_{object_name}") 
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 
@@ -101,7 +103,8 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
                 fingers_joint_angles[0] += 0.005
                 fingers_joint_angles[1] += 0.005
 
-                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
+                # gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
+                gripper_pc = get_gripper_point_cloud(grasp_pose, [0.04,0.04], num_pts=num_pts)
                 
                 if save_gripper_data:
                     transformed_gripper_pcs = []
@@ -116,8 +119,6 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
                 
                 get_gripper_pc = False
             
-            if process_gripper_only:
-                break
             
             if visualization:
 
@@ -128,6 +129,8 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
                 # open3d.visualization.draw_geometries([pcd_partial, pcd_full, pcd_gripper])
                 open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
 
+            if process_gripper_only:
+                break
 
             full_pc = object_particle_state            
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))  # reconstruct the surface mesh.

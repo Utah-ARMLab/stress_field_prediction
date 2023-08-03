@@ -273,6 +273,7 @@ class StaticDataCollection:
         #     self.gym.set_camera_location(self.cam_handles[i], env, pc_cam_position, pc_cam_target)
 
         cam_pos_z = self.max_z_object + 0.03 #self.cfg['sim_params']['platform_height'] + 0.03
+        print_color(f"object height: {self.max_z_object * 2}")
         
         if self.object_name in [f"cuboid0{j}" for j in [4,5]]:
             cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2

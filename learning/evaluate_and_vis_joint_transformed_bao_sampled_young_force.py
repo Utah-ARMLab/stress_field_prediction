@@ -10,7 +10,7 @@ from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb, read_pickle_data, print_color
 from utils.point_cloud_utils import transform_point_cloud
 from utils.stress_utils import *
-from utils.camera_utils import display_images, export_open3d_object_to_image, overlay_texts_on_image, create_media_from_images
+from utils.camera_utils import grid_layout_images, export_open3d_object_to_image, overlay_texts_on_image, create_media_from_images
 from model import StressNet2
 from copy import deepcopy
 
@@ -22,29 +22,22 @@ media_path = "/home/baothach/stress_field_prediction/visualization/stress_predic
 start_time = timeit.default_timer() 
 visualization = False
 num_pts = 1024
-num_query_pts = 100000
-
+num_query_pts = 500000
+use_open_gripper = True
 
 device = torch.device("cuda")
 model = StressNet2(num_channels=5).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon/epoch 100"))
+# model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon/epoch 100"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper/epoch 193"))
 model.eval()
 
 
-for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
+for idx, file_name in enumerate([f"6polygon0{j}" for j in [2]]):
     object_name = os.path.splitext(file_name)[0]
 
     print("======================")
 
-    """
-    6polygon02: grasp 6
-    6polygon03:
-    6polygon04:
-    6polygon05:
-    6polygon06:
-    6polygon07:
-    6polygon08:    
-    """
+
 
     for k in range(0,100):    # 100 grasp poses 32, 7, 8(doesnt work),
         
@@ -54,8 +47,16 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
             continue
         
         with open(gripper_file_name, 'rb') as handle:
-            gripper_data = pickle.load(handle)
+            gripper_data = pickle.load(handle)  # gripper when making contact with object
         
+        if use_open_gripper:
+            file_name = os.path.join(gripper_pc_recording_path, f"open_gripper_data_{object_name}", f"{object_name}_grasp_{k}.pickle")        
+            with open(file_name, 'rb') as handle:
+                open_gripper_data = pickle.load(handle) # gripper when maximally open 
+            open_gripper_pc = open_gripper_data["transformed_gripper_pcs"][0:1]   # shape (8, num_pts, 3)
+            pcd_gripper_open = pcd_ize(open_gripper_pc.squeeze(), color=(1,0,0))
+            augmented_gripper_pc_open = np.concatenate([open_gripper_pc, np.tile(np.array([[0, 0]]), 
+                                                    (1, open_gripper_pc.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)   
         
 
         ### Load static data
@@ -69,10 +70,10 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
         partial_pc = partial_pcs[pc_idx:pc_idx+1,:,:]
         partial_pc_ori = static_data["partial_pcs"][pc_idx]
 
-        ### Load robot gripper point cloud
+        ### Load robot gripper point cloud when making contact with object
         gripper_pc = gripper_data["transformed_gripper_pcs"][pc_idx:pc_idx+1,:,:]   # shape (8, num_pts, 3)
-        augmented_gripper_pc = np.concatenate([gripper_pc, np.tile(np.array([[0, 0]]), 
-                                                (1, gripper_pc.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)      
+        # augmented_gripper_pc = np.concatenate([gripper_pc, np.tile(np.array([[0, 0]]), 
+        #                                         (1, gripper_pc.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)      
         pcd_gripper = pcd_ize(gripper_pc.squeeze(), color=(0,0,0))
 
         ### Sample query points
@@ -84,22 +85,25 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
         pcd_gts = []
         images = []
         vis_gripper = True
-        create_media = True
+        create_media = False
 
         stress_visualization_min = np.log(1e2)  # 1e3
         stress_visualization_max = np.log(5e4)  # 5e4 1e4
 
-        for force in range(0, 16, 3):   # range(0, 16, 3) range(0, 10, 2)
-            for young_modulus in [5]:     # [3, 5, 8, 10, 20, 50]
+        for force in [0,12]:   # range(0, 16, 3) range(0, 10, 2)
+            for young_modulus in [3]:     # [3, 5, 8, 10, 20, 50] [50,20,10,8,5,3]
  
                 print(f"{object_name} - grasp {k} - young {young_modulus:.3f} - force {force:.2f} started")
                                   
-
+                ### Augmented object pc
                 augmented_partial_pcs = np.concatenate([partial_pc, np.tile(np.array([[force, young_modulus]]), 
                                                         (1, partial_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)
             
                 ### Combine object pc and gripper pc
-                combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1) # shape (8, num_pts*2, 5)
+                if use_open_gripper:
+                    combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc_open), axis=1)
+                else:
+                    combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc), axis=1) # shape (8, num_pts*2, 5)
                 combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
                 
                 
@@ -119,16 +123,31 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
                 
                 # # pcd_partial = pcd_ize(partial_pcs.reshape(-1,3), color=[0,0,0])     
                 # # open3d.visualization.draw_geometries([pcd, pcd_gripper, pcd_partial.translate((0.07,0.00,0))])
-                
+
+                img_resolution = [1000,1000]
+                # cam_position=[0.2, -0.2, 0.15]
+                # cam_target = [0, 0, 0]
+                # cam_up_vector = [0, 0, 1]
+                cam_position=[0.0, 0.0, 1.0]
+                cam_target = [0, 0, 0]
+                cam_up_vector = [0, 1, 0] 
+
                 if not create_media:            
-                    open3d.visualization.draw_geometries([pcd, pcd_gripper])
+                    open3d.visualization.draw_geometries([pcd, pcd_gripper, pcd_gripper_open])
+                    
+
+                    # coor = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05)
+                    # image = export_open3d_object_to_image([pcd + pcd_gripper, coor], None, img_resolution,  
+                    #                                       cam_position, cam_target, cam_up_vector, display_on_screen=True)
                 
                 else:
                     if vis_gripper:
-                        image = export_open3d_object_to_image([pcd + pcd_gripper], image_path=None, img_resolution=[1000,1000])
+                        image = export_open3d_object_to_image([pcd + pcd_gripper_open], None, img_resolution,  
+                                                            cam_position, cam_target, cam_up_vector, display_on_screen=False)
                         # vis_gripper = False
                     else:
-                        image = export_open3d_object_to_image([pcd], image_path=None, img_resolution=[1000,1000])
+                        image = export_open3d_object_to_image([pcd], None, img_resolution,  
+                                                            cam_position, cam_target, cam_up_vector, display_on_screen=False)
                     # images.append(image)
 
                     overlaid_image = overlay_texts_on_image(image, texts=[f"{young_modulus*10:.0f} kPa - {force:.1f} N"], 
@@ -158,7 +177,7 @@ for idx, file_name in enumerate([f"6polygon0{j}" for j in [4]]):
 
 
 
-        break
+        # break
 
 
 

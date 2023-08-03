@@ -29,7 +29,7 @@ import yaml
 from isaacgym import gymapi
 from scipy.spatial.transform import Rotation as R
 
-from utils import pandafsm
+from utils import pandafsm_backup as pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
 import open3d

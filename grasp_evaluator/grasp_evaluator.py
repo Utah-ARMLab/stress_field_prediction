@@ -29,7 +29,8 @@ import yaml
 from isaacgym import gymapi
 from scipy.spatial.transform import Rotation as R
 
-from utils import pandafsm
+# from utils import pandafsm
+from utils import pandafsm_backup as pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, read_youngs_value_from_urdf
@@ -139,7 +140,7 @@ class GraspEvaluator:
         f = h5py.File(os.path.join(self.object_path, grasp_file_name), 'r')
         self.grasp_candidate_poses = f['poses'][self.grasp_ind:self.grasp_ind + 1]
         # self.num_grasp_poses = f['poses'].shape[0]
-        # print("========== Number of total grasp candidates", self.num_grasp_poses)
+        # print_color(f"========== Number of grasp candidates: {self.num_grasp_poses}")
        
 
         print("Selected grasp pose:", np.round(self.grasp_candidate_poses, decimals=2))
@@ -466,6 +467,27 @@ class GraspEvaluator:
                                         "object_name": self.object_name, "young_modulus": self.youngs, "object_scale": self.object_scale, \
                                         "grasp_ind": self.grasp_ind, "grasp_pose": self.grasp_candidate_poses}
 
+            # panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
+            #                               gym_handle=self.gym,
+            #                               sim_handle=self.sim,
+            #                               env_handles=self.env_handles,
+            #                               franka_handle=self.franka_handles[i],
+            #                               platform_handle=self.platform_handles[i],
+            #                               object_cof=self.sim_params.flex.dynamic_friction,
+            #                               grasp_transform=grasp_transform,
+            #                               obj_name=self.object_name,
+            #                               env_id=i,
+            #                               hand_origin=self.hand_origins[i],
+            #                               viewer=self.viewer,
+            #                               envs_per_row=self.envs_per_row,
+            #                               env_dim=self.env_dim,
+            #                               youngs=self.youngs,
+            #                               density=self.density,
+            #                               directions=np.asarray(directions),
+            #                               mode=self.mode.lower(),
+            #                               **data_recording_arguments)
+
+
             panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
                                           gym_handle=self.gym,
                                           sim_handle=self.sim,
@@ -483,8 +505,10 @@ class GraspEvaluator:
                                           youngs=self.youngs,
                                           density=self.density,
                                           directions=np.asarray(directions),
-                                          mode=self.mode.lower(),
-                                          **data_recording_arguments)
+                                          mode=self.mode.lower())
+
+
+
             panda_fsms.append(panda_fsm)
 
         close_viewer = False

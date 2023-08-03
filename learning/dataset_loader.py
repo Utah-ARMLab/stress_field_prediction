@@ -5,7 +5,7 @@ import pickle
 import numpy as np  
 import sys
 sys.path.append("../")
-from utils.miscellaneous_utils import read_pickle_data, print_color
+from utils.miscellaneous_utils import read_pickle_data, print_color, pcd_ize
 from utils.point_cloud_utils import transform_point_cloud
 import random
 
@@ -115,7 +115,7 @@ class StressPredictionObjectFrameDataset(Dataset):
 
     def __getitem__(self, idx):   
         
-        num_partial_pc = 8  # 8 1
+        num_partial_pc = 1  # 8 1
 
         query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, self.file_names[idx]))  # shape (B, 3)
         object_name = query_data["object_name"]
@@ -126,8 +126,9 @@ class StressPredictionObjectFrameDataset(Dataset):
         # print("young_modulus", young_modulus)
         
         ### Load robot gripper point cloud
-        gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 
+        gripper_pcs = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"open_gripper_data_{object_name}", 
                                     f"{object_name}_grasp_{grasp_idx}.pickle"))["transformed_gripper_pcs"][0:num_partial_pc]   # shape (8, num_pts, 3)
+        # pcd_ize(gripper_pcs[0], color=[0,0,0], vis=True)
         augmented_gripper_pcs = np.concatenate([gripper_pcs, np.tile(np.array([[0, 0]]), 
                                                 (num_partial_pc, gripper_pcs.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)        
         

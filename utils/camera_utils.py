@@ -150,7 +150,7 @@ def get_partial_point_cloud(gym, sim, env, cam_handle, cam_prop, vis=False):
     return np.array(points).astype('float32') 
  
 
-def display_images(images, num_columns=4, output_file=None):
+def grid_layout_images(images, num_columns=4, output_file=None, display_on_screen=False):
 
     """
     Display N images in a grid layout of size num_columns x np.ceil(N/num_columns) using pytorch.
@@ -159,6 +159,8 @@ def display_images(images, num_columns=4, output_file=None):
     images: a list of torch tensor images, shape (3,H,W).
     
     """
+
+    import cv2
     
     if not isinstance(images[0], torch.Tensor):
         # Convert the images to a PyTorch tensor
@@ -170,13 +172,21 @@ def display_images(images, num_columns=4, output_file=None):
     
     # display result
     img = torchvision.transforms.ToPILImage()(Grid)
-    
+
+    if display_on_screen:
+        # Display figure to screen
+        cv2.imshow('Images', cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR))
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
     if output_file is not None:
         # Save the figure to the specified output file
         img.save(output_file)
     else:
-        # Display figure to screen
-        img.show() 
+        img_np = np.array(img)
+        # Return the grid image as a NumPy array
+        return img_np
+
 
 
 def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], output_file=None):
@@ -188,10 +198,12 @@ def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], o
         # print(image.shape)
         images.append(torch.from_numpy(image).permute(2,0,1) )
 
-    display_images(images, output_file=output_file)
+    grid_layout_images(images, output_file=output_file)
 
 
-def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[500,500], cam_position=[0.0, 0.0, 1.0], cam_target=[0, 0, 0], display_on_screen=False):
+def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[500,500], 
+                                  cam_position=[0.0, 0.0, 1.0], cam_target=[0, 0, 0], cam_up_vector=[0, 0, 1], zoom=None, 
+                                  display_on_screen=False):
     """
     Export open3d objects (point cloud, mesh, etc.) scene to an image. Don't have to manually screenshot anymore.
     
@@ -200,6 +212,7 @@ def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[50
     img_resolution: resolution of the screenshot image. Ex: [600,600]
     cam_position: camera direction. Ex: [0.0, 0.0, 1.0]
     cam_target: camera target point. Ex: [0.0, 0.0, 0.0]
+    zoom: Set the zoom of the visualizer. Increase zoom will create a zoomed-out view; decrease will create a zoomed-in view.
     display_on_screen: the screenshot image will be displayed on the screen. Default is False.
     
     """
@@ -217,20 +230,31 @@ def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[50
     lookat = cam_target  # Camera target point (default is [0, 0, 0])
     view_control.set_front(front)
     view_control.set_lookat(lookat)
-
+    view_control.set_up(cam_up_vector)  # Set the camera up vector
+    
+    if zoom is not None:
+        view_control.set_zoom(zoom)
 
     vis.poll_events()
     vis.update_renderer()
+
+    if display_on_screen:
+        vis.run()  # Display the visualization window on the screen
+    else:
+        if image_path is not None:
+            vis.capture_screen_image(image_path)  # Save the image to the specified file path
+
     
+
     if image_path is None:  # return the image as a NumPy array instead of saving it to a file
         image = np.asarray(vis.capture_screen_float_buffer(True))   # get the image as a np array 
-        vis.destroy_window()
         image = (image * 255).astype(np.uint8)  # Normalize the image array to [0, 255] and convert to uint8 type        
         return image
+    
+    
+    vis.destroy_window()
         
-    if display_on_screen:    
-        vis.capture_screen_image(image_path)
-        vis.destroy_window()  
+ 
 
 
 

@@ -27,6 +27,7 @@ from isaacgym import gymtorch
 
 from utils import panda_fk
 from utils import tet_based_metrics
+from utils.miscellaneous_utils import print_color 
 
 DEBUG = False
 
@@ -893,6 +894,11 @@ class PandaFsm:
                 * object_volume * self.density / self.object_cof
             # self.desired_force /= 100
             # self.FOS /= 100
+            self.desired_force = 4
+            
+            print_color(f"Desired force: {self.desired_force}")
+            
+            
 
 
             self.initial_desired_force = self.desired_force

@@ -71,9 +71,9 @@ def sample_grasps(object_filename, object_scale, cls_sampler=sampling.AntipodalS
     if visualization:
         # scene = visualize.create_scene(object_mesh, 'panda_tube', **results)    # add panda gripper and object to the scene
 
-        # if env_mesh is not None:
-        #     env_mesh.visual.face_colors = [250, 0, 0, 255]
-        #     scene.add_geometry(env_mesh)    # add platform to the scene
+        # # if env_mesh is not None:
+        # #     env_mesh.visual.face_colors = [250, 0, 0, 255]
+        # #     scene.add_geometry(env_mesh)    # add platform to the scene
 
         # scene.show()    
         

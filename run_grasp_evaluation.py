@@ -27,6 +27,7 @@ python3 main.py --object=rectangle --grasp_ind=3 --youngs=2e5 --density=1000
 import argparse
 
 from grasp_evaluator.grasp_evaluator import GraspEvaluator
+# from grasp_evaluator.grasp_evaluator_test import GraspEvaluator
 
 # Create command line flag options
 parser = argparse.ArgumentParser(description='Options')
