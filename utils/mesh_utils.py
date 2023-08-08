@@ -1,8 +1,6 @@
 import numpy as np
 import trimesh
-import pickle
-import os
-
+import open3d
 
 def sample_points_from_tet_mesh(mesh, k):
 
@@ -105,3 +103,23 @@ def simplify_mesh(ms, target_nv):
 		ms.apply_filter('simplification_quadric_edge_collapse_decimation', targetfacenum=numFaces, preservenormal=True)
 		numFaces = numFaces - (ms.current_mesh().vertex_number() - target_nv)
 	return
+
+
+def trimesh_to_open3d_mesh(trimesh_mesh):
+    # Access vertices and faces of the trimesh mesh
+    vertices = np.array(trimesh_mesh.vertices)
+    faces = np.array(trimesh_mesh.faces)
+
+    # Create an open3d TriangleMesh from the vertices and faces
+    open3d_mesh = open3d.geometry.TriangleMesh()
+    open3d_mesh.vertices = open3d.utility.Vector3dVector(vertices)
+    open3d_mesh.triangles = open3d.utility.Vector3iVector(faces)
+
+    return open3d_mesh
+
+def open3d_to_trimesh_mesh(o3d_mesh):
+    vertices = np.asarray(o3d_mesh.vertices)
+    triangles = np.asarray(o3d_mesh.triangles)
+    trimesh_mesh = trimesh.Trimesh(vertices=vertices, faces=triangles)
+    return trimesh_mesh
+

@@ -28,9 +28,8 @@ import yaml
 
 from isaacgym import gymapi
 from scipy.spatial.transform import Rotation as R
-
-# from utils import pandafsm
-from utils import pandafsm_backup as pandafsm
+0
+from utils import pandafsm
 from utils import uniform_sphere
 from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, read_youngs_value_from_urdf
@@ -39,7 +38,7 @@ from isaacgym import gymtorch
 import pickle
 
 
-# Example command: python3 run_grasp_evaluation.py --object=6polygon04 --grasp_ind=0
+# Example command: python3 run_grasp_evaluation.py --object=box01 --grasp_ind=7
 
 class GraspEvaluator:
     """Simulate selected object, grasp, material params, and evaluation mode."""
@@ -75,22 +74,21 @@ class GraspEvaluator:
         self.results_dir = os.path.join(sim_data_main_path, self.cfg['dir']['results_dir'])
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
         
-        prim_name = self.object_name.split('0')[0]
+        # prim_name = self.object_name.split('0')[0]
+        import re
+        prim_name = re.search(r'(\D+)', self.object_name).group(1)   # extract the letter part of the self.object_name string
         self.data_recording_path = os.path.join(self.data_recording_path, f"all_{prim_name}_data") 
         # print_color(self.data_recording_path)
         os.makedirs(self.data_recording_path, exist_ok=True)
         
         self.object_path = os.path.join(self.assets_dir, self.object_name)
-        self.youngs = read_youngs_value_from_urdf(os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf"))
-        print_color(f"self.youngs: {self.youngs}")
+
         
         self.tag = tag
 
         # Load candidate grasp and initialize results folder
         self.get_grasp_candidates()
-        self.data_exists = self.init_results_folder()
-        if not self.cfg['replace_existing_results'] and self.data_exists:
-            return
+
 
         # Create and set up simulation environment
         self.viewer = None
@@ -104,35 +102,6 @@ class GraspEvaluator:
         self.setup_scene()
         self.set_camera()
         
-        
-
-    def init_results_folder(self):
-        """Create folder where results are saved. Returns whether existing results will be kept."""
-        folder_name = self.object_name + "_" + self.cfg['tags']['results_storage_tag']
-        object_file_name = self.object_name + "_" + self.density + "_" + self.youngs + "_" + \
-            self.poissons + "_" + self.mode + "_tag" + self.tag + "_results.h5"
-        self.h5_file_path = os.path.join(
-            self.results_dir, folder_name, self.youngs, object_file_name)
-
-        if os.path.exists(self.h5_file_path) and not self.cfg['replace_existing_results']:
-            existing_h5 = h5py.File(self.h5_file_path, 'r')
-            existing_timed_out = existing_h5['timed_out'][self.grasp_ind,
-                                                          self.oris[0]]
-            existing_succeeded = True
-
-            if self.mode == "pickup":
-                existing_pos_under_gravity_dset = existing_h5[
-                    'positions_under_gravity']
-                if np.all(existing_pos_under_gravity_dset[self.grasp_ind] == 0):
-                    existing_succeeded = False
-
-            existing_h5.close()
-            if existing_timed_out == 0.0 and existing_succeeded:
-                print("Data already exists, returning")
-                return True
-            else:
-                print("Existing data is imperfect, rerunning")
-        return False
 
     def get_grasp_candidates(self):
         """Load the candidate grasp of interest."""
@@ -167,7 +136,7 @@ class GraspEvaluator:
         # Set stress visualization parameters
         sim_params.stress_visualization = True
         sim_params.stress_visualization_min = 0.0   #1.0e2
-        sim_params.stress_visualization_max = 5e3   #1e5
+        sim_params.stress_visualization_max = 5e4   #1e5 5e3
 
         # Set FleX-specific parameters
         sim_params.flex.solver_type = 5
@@ -236,7 +205,10 @@ class GraspEvaluator:
         asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
         # asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
         asset_file_object = os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf")
+        # asset_file_object = f"/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/test_urdf.urdf"
 
+        self.youngs = read_youngs_value_from_urdf(asset_file_object)
+        print_color(f"self.youngs: {float(self.youngs):.2e}")
 
         # Set asset options
         asset_options.fix_base_link = True
@@ -467,27 +439,6 @@ class GraspEvaluator:
                                         "object_name": self.object_name, "young_modulus": self.youngs, "object_scale": self.object_scale, \
                                         "grasp_ind": self.grasp_ind, "grasp_pose": self.grasp_candidate_poses}
 
-            # panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
-            #                               gym_handle=self.gym,
-            #                               sim_handle=self.sim,
-            #                               env_handles=self.env_handles,
-            #                               franka_handle=self.franka_handles[i],
-            #                               platform_handle=self.platform_handles[i],
-            #                               object_cof=self.sim_params.flex.dynamic_friction,
-            #                               grasp_transform=grasp_transform,
-            #                               obj_name=self.object_name,
-            #                               env_id=i,
-            #                               hand_origin=self.hand_origins[i],
-            #                               viewer=self.viewer,
-            #                               envs_per_row=self.envs_per_row,
-            #                               env_dim=self.env_dim,
-            #                               youngs=self.youngs,
-            #                               density=self.density,
-            #                               directions=np.asarray(directions),
-            #                               mode=self.mode.lower(),
-            #                               **data_recording_arguments)
-
-
             panda_fsm = pandafsm.PandaFsm(cfg=self.cfg,
                                           gym_handle=self.gym,
                                           sim_handle=self.sim,
@@ -505,7 +456,9 @@ class GraspEvaluator:
                                           youngs=self.youngs,
                                           density=self.density,
                                           directions=np.asarray(directions),
-                                          mode=self.mode.lower())
+                                          mode=self.mode.lower(),
+                                          **data_recording_arguments)
+
 
 
 

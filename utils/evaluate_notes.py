@@ -8,6 +8,7 @@
 6polygon06: grasp 0
 6polygon07:
 6polygon08: grasp 6   
+lemon02: 11, 27
 
 Open3D Visualizer camera config:
 ***6polygon04: 

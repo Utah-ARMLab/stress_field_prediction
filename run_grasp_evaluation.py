@@ -66,5 +66,4 @@ if __name__ == "__main__":
     grasp_evaluator = GraspEvaluator(args.object, args.grasp_ind, oris, args.density,
                                      args.youngs, args.poissons, args.friction, args.mode, args.tag)
 
-    if not grasp_evaluator.data_exists:
-        grasp_evaluator.run_simulation()
+    grasp_evaluator.run_simulation()

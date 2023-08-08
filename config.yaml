@@ -1,6 +1,6 @@
 
 
-use_viewer: True
+use_viewer: False
 replace_existing_results: False
 write_results: True
 
@@ -11,10 +11,10 @@ tags:
   results_storage_tag: 'mytag'
 
 force_control:
+  Kp: 0.01 #0.006 0.010
+  min_torque: -0.05
   # Kp: 0.002
   # min_torque: -0.05
-  Kp: 0.002
-  min_torque: -0.05
 
 dir:
   assets_dir: dgn_dataset_varying_stiffness  #'objects' dgn_dataset dgn_dataset_varying_stiffness
@@ -22,8 +22,8 @@ dir:
   results_dir: 'results' 
 
 data_recording:
-  is_recording: False
-  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/test'
+  is_recording: True
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives'
 
 miscellaneous:
   force_debug: False

@@ -195,6 +195,25 @@ def read_youngs_value_from_urdf(urdf_file):
 
     return None
 
+# def find_folder_directory(folder_name):
+#     """
+#     Recursively searches for the absolute path of a folder (given its name), 
+#     in the current working directory and its parent directories.
+
+#     Parameters:
+#         folder_name (str): The name of the folder to search for.
+
+#     Returns:
+#         str or None: The absolute path to the folder if found, else None.
+#     """
+    
+#     current_dir = os.getcwd()   # absolute path of the current working directory
+#     while current_dir != "/" and os.path.basename(current_dir) != folder_name:
+#         current_dir = os.path.dirname(current_dir)
+#     if os.path.basename(current_dir) == folder_name:
+#         return current_dir
+#     else:
+#         return None  # Folder not found
 
 
     

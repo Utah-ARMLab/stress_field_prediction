@@ -6,7 +6,7 @@ import timeit
 import sys
 sys.path.append("../")
 
-from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, sample_points_from_tet_mesh, print_color
+from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, print_color
 
 
 
@@ -64,9 +64,9 @@ for object_name in [f"6polygon0{j}" for j in [4]]:
             # pcd_full = pcd_ize(data["object_particle_state"], color=[1,0,0])
             # open3d.visualization.draw_geometries([pcd_full, pcd_partial])  
             
-            if fix_data:            
-                with open(file_name, 'wb') as handle:
-                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)    
+            # if fix_data:            
+            #     with open(file_name, 'wb') as handle:
+            #         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)    
                     
                     
             break

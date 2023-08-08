@@ -10,8 +10,15 @@ from utils.miscellaneous_utils import print_color
 start_time = timeit.default_timer() 
 grasp_idx_bounds = [0, 100]     # [0, 100]
 
+selected_objects = \
+[f"lemon0{j}" for j in [1,2,3]] + \
+[f"strawberry0{j}" for j in [1,2,3]] + \
+[f"tomato{j}" for j in [1]] + \
+[f"apple{j}" for j in [3]] + \
+[f"potato{j}" for j in [3]]
 
-for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:
+for object_name in selected_objects:
+# for object_name in [f"apple{j}" for j in [3]]:
     for grasp_idx in range(*grasp_idx_bounds):
         # grasp_idx = 9
         print_color(f"===================== Started {object_name} - grasp {grasp_idx}")

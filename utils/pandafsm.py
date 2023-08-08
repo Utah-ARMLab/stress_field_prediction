@@ -893,10 +893,26 @@ class PandaFsm:
             self.mg = 9.81 * object_volume * self.density
             # self.desired_force = self.FOS * 9.81 \
             #     * object_volume * self.density / self.object_cof    * 100
-            self.desired_force = 16.0#1.0
+            
+            self.max_recorded_force = 60.0
+           
+            if 1e3 <= self.youngs < 1e4:
+                self.force_record_resolution = 0.1
+                self.max_recorded_force = 15.0
+            elif 1e4 <= self.youngs < 1e5:
+                self.force_record_resolution = 0.5
+            elif 1e5 <= self.youngs < 5e5:
+                self.force_record_resolution = 1.0
+            elif 5e5 <= self.youngs < 1e6:
+                self.force_record_resolution = 2.0
+            else:
+                self.force_record_resolution = 5.0
+                                
             self.curr_recording_force = 0.0
-            self.max_force_allowed = 16.0
             self.recorded_force_count = 0
+
+            self.desired_force = self.max_recorded_force + 5   #16.0#1.0            
+            self.max_force_allowed = self.max_recorded_force + 5   #16.0
 
             # self.FOS /= 100
 
@@ -1185,7 +1201,7 @@ class PandaFsm:
             # ) and not self.squeezed_until_force and squeeze_guard and np.all(
             #         particles_contacting_gripper > 0):
             
-            if self.f_moving_average[-1] >= self.curr_recording_force + 3.0:    # abrupt change in force
+            if self.f_moving_average[-1] >= self.curr_recording_force + 5.0:  #+ 3.0:    # abrupt change in force
                 print_color("Abrupt change in force. Stop simulation.")
                 self.state = "done"
 
@@ -1206,9 +1222,9 @@ class PandaFsm:
                                                 self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
                     self.recorded_force_count += 1
 
-                self.curr_recording_force += 0.25
+                self.curr_recording_force += self.force_record_resolution   #0.25
                 
-                if self.curr_recording_force > 15:
+                if self.curr_recording_force > self.max_recorded_force:
                     self.state = "done"
                               
                 # self.state = "done" # collect unseen objects FIX

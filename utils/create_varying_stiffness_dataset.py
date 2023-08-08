@@ -7,9 +7,19 @@ density = 1000
 poissons = 0.3
 attach_dist = 0.0
 scale = 1
-youngs_bounds = np.log([1e4, 5e5])
+# youngs_bounds = np.log([1e4, 5e5])
+youngs_bounds = np.log([1e3, 1e7])
 
-for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:  # 1,2,3,4,5,6,7,8
+selected_objects = \
+[f"lemon0{j}" for j in [1,2,3]] + \
+[f"strawberry0{j}" for j in [1,2,3]] + \
+[f"tomato{j}" for j in [1]] + \
+[f"apple{j}" for j in [3]] + \
+[f"potato{j}" for j in [3]]
+
+
+for object_name in selected_objects:
+# for object_name in [f"lemon0{j}" for j in [1,2,3]]:  # 1,2,3,4,5,6,7,8
 
     object_urdf_path = f"../sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/{object_name}"
 
