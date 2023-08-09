@@ -21,7 +21,7 @@ gripper = create_gripper('panda', 0.00, franka_gripper_mesh_main_path="../grasps
 
 mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness"
 # object_names = ["6polygon04", "cuboid01", "cylinder05", "ellipsoid04", "sphere06"]
-object_names = [f"box0{j}" for j in [1,2,3,4,5,6,7]]   #[f"6polygon0{j}" for j in [1,4]] + [f"sphere0{j}" for j in [1,2,3,4,5,6]] 
+object_names = [f"sphere0{j}" for j in [3,4]]   #[f"6polygon0{j}" for j in [1,4]] + [f"sphere0{j}" for j in [1,2,3,4,5,6]] 
 # meshes = [gripper.mesh.apply_translation([-0.,0,0])]
 meshes = []
 
@@ -29,9 +29,9 @@ for i, obj_name in enumerate(object_names):
     mesh_dir = os.path.join(mesh_main_path, obj_name)
     fname_object = os.path.join(mesh_dir, f"{obj_name}.stl")
     mesh = trimesh.load(fname_object)
-    meshes.append(mesh.apply_translation(get_mesh_position(i, num_cols=2, spacing=0.1)))
+    meshes.append(mesh.apply_translation(get_mesh_position(i, num_cols=2, spacing=0.07)))
     
-    # print("mesh.extents:", mesh.extents)
+    print("mesh.extents:", mesh.extents)
 
 trimesh.Scene(meshes).show()
 

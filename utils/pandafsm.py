@@ -897,7 +897,7 @@ class PandaFsm:
             self.max_recorded_force = 60.0
            
             if 1e3 <= self.youngs < 1e4:
-                self.force_record_resolution = 0.1
+                self.force_record_resolution = 0.25     #0.1
                 self.max_recorded_force = 15.0
             elif 1e4 <= self.youngs < 1e5:
                 self.force_record_resolution = 0.5

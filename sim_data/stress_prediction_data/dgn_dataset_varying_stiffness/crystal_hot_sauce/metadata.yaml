@@ -1,0 +1,10 @@
+board_size: {x: 8, y: 9}
+depth_scale_factor: 0.0001
+export_time: '2014-05-19 17:23:13.907832'
+has_poisson_mesh: true
+has_tsdf_mesh: true
+id: 111
+name: crystal_hot_sauce
+set: set_05_10_04_30PM
+square_size: 0.018923
+version: 1

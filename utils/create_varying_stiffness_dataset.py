@@ -18,8 +18,8 @@ selected_objects = \
 [f"potato{j}" for j in [3]]
 
 
-for object_name in selected_objects:
-# for object_name in [f"lemon0{j}" for j in [1,2,3]]:  # 1,2,3,4,5,6,7,8
+# for object_name in selected_objects:
+for object_name in [f"ellipsoid0{j}" for j in [1,2,3,4]]:  # 1,2,3,4,5,6,7,8
 
     object_urdf_path = f"../sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/{object_name}"
 

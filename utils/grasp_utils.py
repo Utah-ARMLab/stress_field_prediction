@@ -75,6 +75,12 @@ def sample_grasps(object_asset, cls_sampler="AntipodalSampler", object_scale=1, 
         object_mesh = object_asset
     
     elif isinstance(object_asset, np.ndarray):
+        
+        """ 
+        open3d Surface Reconstruction:
+        http://www.open3d.org/docs/latest/tutorial/Advanced/surface_reconstruction.html
+        """
+        
         print(f"Load object as full point cloud, then reconstruct the surface mesh ...")
         reconstructed_mesh = open3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd_ize(object_asset), 
                                                                                 surface_reconstruction_params['alpha'])

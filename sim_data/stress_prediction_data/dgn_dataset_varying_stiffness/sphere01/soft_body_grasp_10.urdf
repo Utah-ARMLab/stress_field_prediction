@@ -5,7 +5,7 @@
                 <fem>
                     <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
                     <density value="1000" />
-                    <youngs value="2.38e05"/>
+                    <youngs value="1.52e05"/>
                     <poissons value="0.3"/>
                     <damping value="0.0" />
                     <attachDistance value="0.0"/>

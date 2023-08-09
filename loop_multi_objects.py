@@ -17,8 +17,9 @@ selected_objects = \
 [f"apple{j}" for j in [3]] + \
 [f"potato{j}" for j in [3]]
 
-for object_name in selected_objects:
-# for object_name in [f"apple{j}" for j in [3]]:
+# for object_name in selected_objects:
+for object_name in [f"cylinder0{j}" for j in range(1,9)] + [f"sphere0{j}" for j in [1,3,4,6]] \
+                + [f"ellipsoid0{j}" for j in [1,2,3,4]]:
     for grasp_idx in range(*grasp_idx_bounds):
         # grasp_idx = 9
         print_color(f"===================== Started {object_name} - grasp {grasp_idx}")

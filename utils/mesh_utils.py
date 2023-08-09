@@ -95,14 +95,25 @@ def create_tet_mesh(mesh_dir, intput_tri_mesh_name, output_tet_mesh_name=None, m
         tet_output.write("t " + l_text + "\n")  
         
         
-def simplify_mesh(ms, target_nv):
+def simplify_mesh_pymeshlab(mesh, target_num_vertices):
+    
+    import pymeshlab as ml
+    
+    if not isinstance(mesh, trimesh.Trimesh):
+        raise ValueError("Invalid mesh type. Must be a Trimesh object") 
+    
 	# https://stackoverflow.com/questions/65419221/how-to-use-pymeshlab-to-reduce-vertex-number-to-a-certain-number/65424578#65424578
-	numFaces = 100 + 2*target_nv
+    numFaces = 100 + 2*target_num_vertices
 
-	while (ms.current_mesh().vertex_number() > target_nv):
-		ms.apply_filter('simplification_quadric_edge_collapse_decimation', targetfacenum=numFaces, preservenormal=True)
-		numFaces = numFaces - (ms.current_mesh().vertex_number() - target_nv)
-	return
+    ms = ml.MeshSet()
+    pymeshlab_mesh = ml.Mesh(mesh.vertices, mesh.faces)
+    ms.add_mesh(pymeshlab_mesh)    
+  
+    while (ms.current_mesh().vertex_number() > target_num_vertices):
+        ms.apply_filter('simplification_quadric_edge_collapse_decimation', targetfacenum=numFaces, preservenormal=True)
+        numFaces = numFaces - (ms.current_mesh().vertex_number() - target_num_vertices)
+    
+    return trimesh.Trimesh(vertices=ms.current_mesh().vertex_matrix(), faces=ms.current_mesh().face_matrix()) 
 
 
 def trimesh_to_open3d_mesh(trimesh_mesh):

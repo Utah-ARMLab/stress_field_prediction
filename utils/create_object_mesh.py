@@ -7,7 +7,7 @@ import open3d
 from copy import deepcopy
 import sys
 sys.path.append("../")
-from utils.mesh_utils import create_tet_mesh, simplify_mesh
+from utils.mesh_utils import create_tet_mesh, simplify_mesh_pymeshlab
 import pymeshlab as ml
 
 
