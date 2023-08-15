@@ -203,9 +203,14 @@ class GraspEvaluator:
 
         # Load Franka and object assets
         asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
-        # asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
-        asset_file_object = os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf")
+        # asset_file_object = os.path.join(self.object_path, "soft_body.urdf")        
         # asset_file_object = f"/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/test_urdf.urdf"
+
+        if self.cfg['data_recording']['is_evaluating']:
+            asset_file_object = os.path.join(self.object_path, f"evaluate_soft_body.urdf")
+        else:
+            asset_file_object = os.path.join(self.object_path, f"soft_body_grasp_{self.grasp_ind}.urdf")
+            
 
         self.youngs = read_youngs_value_from_urdf(asset_file_object)
         print_color(f"self.youngs: {float(self.youngs):.2e}")

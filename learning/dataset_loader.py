@@ -1,7 +1,7 @@
 import torch
 import os
 from torch.utils.data import Dataset
-import pickle   
+import pickle5 as pickle   
 import numpy as np  
 import sys
 sys.path.append("../")
@@ -115,7 +115,7 @@ class StressPredictionObjectFrameDataset(Dataset):
 
     def __getitem__(self, idx):   
         
-        num_partial_pc = 1  # 8 1
+        num_partial_pc = 8  # 8 1
 
         query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, self.file_names[idx]))  # shape (B, 3)
         object_name = query_data["object_name"]

@@ -59,18 +59,18 @@ class StressNet(nn.Module):
         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)        
         x_pc = l3_points.view(B, 256)
 
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((x_pc, x_qr),dim=-1)
         
-        x_stress = F.relu(self.bn1(self.fc1(x)))
-        x_stress = F.relu(self.bn2(self.fc2(x_stress)))
+        x_stress = F.elu(self.bn1(self.fc1(x)))
+        x_stress = F.elu(self.bn2(self.fc2(x_stress)))
         x_stress = self.fc3(x_stress)
 
-        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
-        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = F.elu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.elu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
 
@@ -125,11 +125,11 @@ class PointCloudEncoderConv1D(nn.Module):
 
     def forward(self, pc):
         #encoder
-        x = F.relu(self.bn1(self.conv1(pc)))
-        x = F.relu(self.bn1(self.conv2(x)))
-        x = F.relu(self.bn1(self.conv3(x)))
-        x = F.relu(self.bn2(self.conv4(x)))
-        x = F.relu(self.bn3(self.conv5(x)))
+        x = F.elu(self.bn1(self.conv1(pc)))
+        x = F.elu(self.bn1(self.conv2(x)))
+        x = F.elu(self.bn1(self.conv3(x)))
+        x = F.elu(self.bn2(self.conv4(x)))
+        x = F.elu(self.bn3(self.conv5(x)))
 
         # do max pooling 
         x = torch.max(x, 2, keepdim=True)[0]
@@ -170,18 +170,18 @@ class QueryEmbedder(nn.Module):
 
     def forward(self, pc_embedding, query):
        
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, x_qr),dim=-1)
         
-        x_stress = F.relu(self.bn1(self.fc1(x)))
-        x_stress = F.relu(self.bn2(self.fc2(x_stress)))
+        x_stress = F.elu(self.bn1(self.fc1(x)))
+        x_stress = F.elu(self.bn2(self.fc2(x_stress)))
         x_stress = self.fc3(x_stress)
 
-        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
-        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = F.elu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.elu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
 
@@ -240,14 +240,14 @@ class QueryEmbedderStressOnly(nn.Module):
 
     def forward(self, pc_embedding, query):
        
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, x_qr),dim=-1)
         
-        x_stress = F.relu(self.bn1(self.fc1(x)))
-        x_stress = F.relu(self.bn2(self.fc2(x_stress)))
+        x_stress = F.elu(self.bn1(self.fc1(x)))
+        x_stress = F.elu(self.bn2(self.fc2(x_stress)))
         x_stress = self.fc3(x_stress)
 
         return x_stress
@@ -303,14 +303,14 @@ class QueryEmbedderOccupancyOnly(nn.Module):
 
     def forward(self, pc_embedding, query):
        
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, x_qr),dim=-1)
         
-        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
-        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = F.elu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.elu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
 
@@ -368,14 +368,14 @@ class QueryEmbedderOccupancyOnly2(nn.Module):
 
     def forward(self, pc_embedding, gripper_embedding, query):
        
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, gripper_embedding, x_qr),dim=-1)
         
-        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
-        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = F.elu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.elu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
 
@@ -438,14 +438,14 @@ class QueryEmbedderOccupancyOnly3(nn.Module):
 
     def forward(self, pc_embedding, force_embedding, query):
        
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, force_embedding, x_qr),dim=-1)
         
-        x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
-        x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
+        x_occ = F.elu(self.bn1_occ(self.fc1_occ(x)))
+        x_occ = F.elu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
 
@@ -469,9 +469,9 @@ class ForceEncoder(nn.Module):
 
     def forward(self, force):
        
-        x_force = F.relu(self.bn1_force(self.fc1_force(force)))
-        x_force = F.relu(self.bn2_force(self.fc2_force(x_force)))
-        x_force = F.relu(self.bn3_force(self.fc3_force(x_force)))
+        x_force = F.elu(self.bn1_force(self.fc1_force(force)))
+        x_force = F.elu(self.bn2_force(self.fc2_force(x_force)))
+        x_force = F.elu(self.bn3_force(self.fc3_force(x_force)))
         
         return x_force 
     
@@ -531,14 +531,14 @@ class QueryEmbedderSDF(nn.Module):
 
     def forward(self, pc_embedding, query):
    
-        x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
-        x_qr = F.relu(self.bn2_query(self.fc2_query(x_qr)))
-        x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
+        x_qr = F.elu(self.bn1_query(self.fc1_query(query)))
+        x_qr = F.elu(self.bn2_query(self.fc2_query(x_qr)))
+        x_qr = F.elu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, x_qr),dim=-1)
         
-        x_sdf = F.relu(self.bn1_sdf(self.fc1_sdf(x)))
-        x_sdf = F.relu(self.bn2_sdf(self.fc2_sdf(x_sdf)))
+        x_sdf = F.elu(self.bn1_sdf(self.fc1_sdf(x)))
+        x_sdf = F.elu(self.bn2_sdf(self.fc2_sdf(x_sdf)))
         x_sdf = self.fc3_sdf(x_sdf)
 
         return x_sdf 

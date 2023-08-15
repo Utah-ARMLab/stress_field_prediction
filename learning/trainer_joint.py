@@ -19,8 +19,8 @@ from utils.miscellaneous_utils import print_color
 ### Log for loss/accuracy plotting later
 train_stress_losses = []
 test_stress_losses = []
-# train_occ_losses = []
-# test_occ_losses = []
+train_occ_losses = []
+test_occ_losses = []
 train_accuracies = []
 test_accuracies = []
 
@@ -72,7 +72,7 @@ def train(model, device, train_loader, optimizer, epoch):
             loss_stress = 0
                     
 
-        loss_occ *= 65  # balance the two stress components 65 85 70
+        loss_occ *= 90  # balance the two stress components 65 85 70
         
         # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
         loss = loss_occ + loss_stress   
@@ -94,6 +94,7 @@ def train(model, device, train_loader, optimizer, epoch):
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
             train_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
             train_accuracies.append(100.* batch_correct / output[0].shape[0])
+            train_occ_losses.append(loss_occ.item())
     
     print('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
@@ -148,6 +149,7 @@ def test(model, device, test_loader, epoch):
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
             test_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
             test_accuracies.append(100.* batch_correct / output[0].shape[0])      
+            test_occ_losses.append(nn.BCELoss()(output[1], target_occupancy).item())
                             
 
     test_loss /= len(test_loader.dataset)
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper"
+        "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -185,15 +187,26 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
-    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-    object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]     # [3,4,5,6,7,8]
+    # object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]     # [3,4,5,6,7,8]
+
+    selected_objects = []
+    selected_objects += \
+    [f"lemon0{j}" for j in [1,3]] + \
+    [f"strawberry0{j}" for j in [1]] + \
+    [f"tomato{j}" for j in [1]] + \
+    [f"apple{j}" for j in [3]] + \
+    [f"potato{j}" for j in [3]]
+    selected_objects += ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol"]
+    selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,10)] \
+                    + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
 
     # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
-    dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
+    dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, selected_objects, joint_training=True)
     dataset_size = len(dataset)
-    batch_size = 250     # 30   250     
+    batch_size = 30     # 30   250     
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)
@@ -212,10 +225,15 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
-    print("Total dataset size: ", len(dataset))
+    print("*** Total dataset size: ", len(dataset))
+    print_color(f"*** Total number of objects: {len(selected_objects)}")
     print("training data: ", len(train_dataset))
     print("test data: ", len(test_dataset))
     print("data path:", dataset.dataset_path)
+
+    logger.info(f"*** Total dataset size: {len(dataset)}")
+    logger.info(f"*** Total number of objects: {len(selected_objects)}")   
+    logger.info(f"\nObject list: {selected_objects}\n") 
     logger.info(f"Train len: {len(train_dataset)}")    
     logger.info(f"Test len: {len(test_dataset)}") 
     logger.info(f"Data path: {dataset.dataset_path}") 
@@ -225,10 +243,10 @@ if __name__ == "__main__":
     model.apply(weights_init)
       
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
     
     start_time = timeit.default_timer()
-    for epoch in range(0, 201):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
+    for epoch in range(0, 101):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

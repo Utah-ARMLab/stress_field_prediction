@@ -79,6 +79,10 @@ class StaticDataCollection:
         self.data_recording_path = self.cfg['data_recording']['data_recording_path']
         os.makedirs(self.data_recording_path, exist_ok=True)
         
+        self.exclusive_objects = ["apple", "lemon", "potato", "strawberry", "tomato"
+                                  "pepto_bismol", "crystal_hot_sauce", "bleach_cleanser"
+                                  "box08", "box09", "ellipsoid05"]
+        
         self.object_path = os.path.join(self.assets_dir, self.object_name)
         self.tag = tag
 
@@ -233,7 +237,11 @@ class StaticDataCollection:
 
         # Load Franka and object assets
         asset_file_platform = os.path.join(self.platform_asset_dir, 'platform.urdf')
-        asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
+        # asset_file_object = os.path.join(self.object_path, "soft_body.urdf")
+        if self.cfg['data_recording']['is_evaluating']:
+            asset_file_object = os.path.join(self.object_path, f"evaluate_soft_body.urdf")
+        else:
+            asset_file_object = os.path.join(self.object_path, f"soft_body_grasp_{0}.urdf")
 
 
         asset_options.fix_base_link = False
@@ -272,8 +280,11 @@ class StaticDataCollection:
         #     self.cam_handles.append(self.gym.create_camera_sensor(env, self.pc_cam_props))
         #     self.gym.set_camera_location(self.cam_handles[i], env, pc_cam_position, pc_cam_target)
 
+        pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
         cam_pos_z = self.max_z_object + 0.03 #self.cfg['sim_params']['platform_height'] + 0.03
         print_color(f"object height: {self.max_z_object * 2}")
+        
+        
         
         if self.object_name in [f"cuboid0{j}" for j in [4,5]]:
             cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2
@@ -286,13 +297,28 @@ class StaticDataCollection:
             cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.2  
         elif self.object_name in [f"box0{j}" for j in [7]]:
             cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 1.5
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.5  
+            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.5              
+        elif self.object_name in ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol", "box08"]:
+            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 1.5
+            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.5    
+            cam_pos_z = self.max_z_object + 0.06
         else:
             cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) #* 0.5
             cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) #* 0.5
+
+        if any([name in self.object_name for name in self.exclusive_objects]):
+           
+            print_color(f"object_centroid: {self.object_centroid}")
+            
+            cam_pos_xs += self.object_centroid[0]  
+            cam_pos_ys += self.object_centroid[1]    
+            
+            pc_cam_target.x += self.object_centroid[0]      
+            pc_cam_target.y += self.object_centroid[1]
+            
+                        
         
-        pc_cam_positions = []
-        pc_cam_target = gymapi.Vec3(0.0, 0.0, self.cfg['sim_params']['platform_height'])
+        pc_cam_positions = []        
         for i in range(len(cam_pos_xs)):
             pc_cam_positions.append(gymapi.Vec3(cam_pos_xs[i],cam_pos_ys[i],cam_pos_z))
             
@@ -329,11 +355,18 @@ class StaticDataCollection:
         mesh_lines = list(open(tet_file, "r"))
         mesh_lines = [line.strip('\n') for line in mesh_lines]
         zs = []
+        particles = []
         for ml in mesh_lines:
             sp = ml.split(" ")
             if sp[0] == 'v':
                 zs.append(float(sp[3]))
+                if any([name in self.object_name for name in self.exclusive_objects]):
+                    particles.append([float(sp[j]) for j in range(1,4)])
+                    
         self.max_z_object = max(zs)
+        if any([name in self.object_name for name in self.exclusive_objects]):
+            self.object_centroid = np.mean(particles, axis=0)
+        
         return 2 * abs(min(zs))
 
     def setup_scene(self):
@@ -420,45 +453,54 @@ class StaticDataCollection:
                 visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
                                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
-                # static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-                # os.makedirs(static_data_recording_path, exist_ok=True)
-                # segmentationId_dict = {"robot": 11, "platform": 12}
-                # partial_pcs = []    # list of 8 point clouds from 8 different camera views
-                # for cam_handle in self.cam_handles:
-                #     partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
-                #                                                 segmentationId_dict, object_name="deformable", color=None, min_z=-50.005, 
-                #                                                 visualization=False, device="cpu")                   
-                #     partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])  # shape (1,num_pts,3)
+                static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
+                os.makedirs(static_data_recording_path, exist_ok=True)
+                segmentationId_dict = {"robot": 11, "platform": 12}
+                partial_pcs = []    # list of 8 point clouds from 8 different camera views
+                for cam_handle in self.cam_handles:
+                    partial_pc = get_partial_pointcloud_vectorized(self.gym, self.sim, self.env_handles[0], cam_handle, self.pc_cam_props, 
+                                                                segmentationId_dict, object_name="deformable", color=None, min_z=-50.005, 
+                                                                visualization=False, device="cuda")  # options: cpu cuda                  
+                    partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])  # shape (1,num_pts,3)
 
-                # partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)  # shape (8,num_pts,3)
-                # # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
-                # # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
+                partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)  # shape (8,num_pts,3)
+                # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
+                # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
-                # (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
-                # tri_indices = np.array(tri_indices).reshape(-1,3)   # shape (num_triangles, 3)
+                (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
+                tri_indices = np.array(tri_indices).reshape(-1,3)   # shape (num_triangles, 3)
                 
-                # (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)    
-                # tet_indices = np.array(tet_indices).reshape(-1,4)   # shape (num_tetrahedra, 4)
-                # # print(tri_indices.shape, tet_indices.shape)
+                (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)    
+                tet_indices = np.array(tet_indices).reshape(-1,4)   # shape (num_tetrahedra, 4)
+                # print(tri_indices.shape, tet_indices.shape)
                 
-                # homo_mats = []  # length partial_pcs.shape[0] or num_cameras
-                # for pc in partial_pcs:
-                #     homo_mats.append(world_to_object_frame(pc)) # transform point clouds in world frame, to point clouds in object frame.
+                homo_mats = []  # length partial_pcs.shape[0] or num_cameras
+                for pc in partial_pcs:
+                    homo_mats.append(world_to_object_frame(pc)) # transform point clouds in world frame, to point clouds in object frame.
 
-                # transformed_partial_pcs = []
-                # for i in range(8):
-                #     transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
-                # transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
-                # # print(transformed_partial_pcs.shape)       
+                transformed_partial_pcs = []
+                for i in range(8):
+                    transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
+                transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
+                # print(transformed_partial_pcs.shape)       
 
 
-                # adjacent_tetrahedral_dict = get_adjacent_tetrahedrals_of_vertex(tet_indices)    
+                adjacent_tetrahedral_dict = get_adjacent_tetrahedrals_of_vertex(tet_indices)    
 
-                # data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
-                #         "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
-                #         "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict}
-                # with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
-                #     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
+
+                evaluate_objects = ["strawberry02", "lemon02", "mustard_bottle"]
+                if self.object_name in evaluate_objects:
+                    data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
+                            "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
+                            "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict, "undeformed_full_pc": get_object_particle_state()}
+
+                else:
+                    data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
+                            "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
+                            "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict}
+                    
+                with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
+                    pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
                    
                 # # pcds = []

@@ -1,11 +1,11 @@
 import open3d
 import os
 import numpy as np
-import pickle
+import pickle5 as pickle
 import timeit
 import sys
 import argparse
-
+import re
 import isaacgym
 sys.path.append("../")
 from utils.process_data_utils import *
@@ -20,35 +20,47 @@ Process data collected by Bao.
 """
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-# gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/gripper_data_6polygon04"
-# os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
-data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
-# data_recording_path = os.path.join(data_main_path, "all_6polygon_data")
-data_recording_path = os.path.join(data_main_path, "unseen_6polygons")
-# data_processed_path = "/home/baothach/shape_servo_data/stress_field_prediction/processed_data_6polygon04"
-# os.makedirs(data_processed_path, exist_ok=True)
+data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives"
 
-# data_point_count = len(os.listdir(data_processed_path))
+
+selected_objects = []
+# selected_objects += \
+# [f"lemon0{j}" for j in [1,2,3]] + \
+# [f"strawberry0{j}" for j in [1,2,3]] + \
+# [f"tomato{j}" for j in [1]] + \
+# [f"apple{j}" for j in [3]] + \
+# [f"potato{j}" for j in [3]]
+# selected_objects += ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol"]
+# selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,10)] \
+#                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
+
+selected_objects += [f"box0{j}" for j in range(9,10)]
+
+
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = True
+process_gripper_only = False
 save_gripper_data = True
 
 num_pts = 1024
 num_query_pts = 2000
 
-grasp_idx_bounds = [0, 100]
+grasp_idx_bounds = [0, 100]     # [0, 100]
 
 
-for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
+# for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
+for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
+
+    prim_name = re.search(r'(\D+)', object_name).group(1)
+    data_recording_path = os.path.join(data_main_path, f"all_{prim_name}_data")
 
     if not process_gripper_only:
-        data_processed_path = os.path.join(data_main_path,  f"processed_data_{object_name}")       
+        data_processed_path = os.path.join(data_main_path,  f"processed/processed_data_{object_name}")       
         os.makedirs(data_processed_path, exist_ok=True)
         data_point_count = len(os.listdir(data_processed_path))
     # gripper_pc_recording_path = os.path.join(data_main_path,  f"gripper_data_{object_name}")
-    gripper_pc_recording_path = os.path.join(data_main_path,  f"open_gripper_data_{object_name}") 
+    gripper_pc_recording_path = os.path.join(data_main_path,  f"processed/open_gripper_data_{object_name}") 
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 
@@ -68,7 +80,7 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
         get_gripper_pc = True
         
         # for force_idx in [0,30]:
-        for force_idx in range(0,61):
+        for force_idx in range(0,121):
             
             # print(f"{object_name} - grasp {grasp_idx} - force {force_idx} started")
             
@@ -171,7 +183,9 @@ for object_name in [f"6polygon0{j}" for j in [1,2]]:    # 1,2,3,4,5,6,7,8
             stress_outside = -4 * np.ones(query_points_outside.shape[0])
 
 
-            assert query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts
+            if not (query_points_outside.shape[0] == num_query_pts and query_points_volume.shape[0] == num_query_pts):
+                print("volume, outside:", query_points_volume.shape[0], query_points_outside.shape[0])
+                raise ValueError("Wrong number of query points.")
                                        
 
             all_query_points = np.concatenate((query_points_volume, query_points_outside), axis=0)

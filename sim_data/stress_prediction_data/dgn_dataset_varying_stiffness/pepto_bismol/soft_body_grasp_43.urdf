@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>    
+
+        <robot name="pepto_bismol">
+            <link name="pepto_bismol">    
+                <fem>
+                    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
+                    <density value="1000" />
+                    <youngs value="5.57e04"/>
+                    <poissons value="0.3"/>
+                    <damping value="0.0" />
+                    <attachDistance value="0.0"/>
+                    <tetmesh filename="pepto_bismol.tet"/>
+                    <scale value="1"/>
+                </fem>
+            </link>
+
+        </robot>
+        

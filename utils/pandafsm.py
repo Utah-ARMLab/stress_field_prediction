@@ -894,25 +894,39 @@ class PandaFsm:
             # self.desired_force = self.FOS * 9.81 \
             #     * object_volume * self.density / self.object_cof    * 100
             
-            self.max_recorded_force = 60.0
-           
-            if 1e3 <= self.youngs < 1e4:
-                self.force_record_resolution = 0.25     #0.1
-                self.max_recorded_force = 15.0
-            elif 1e4 <= self.youngs < 1e5:
-                self.force_record_resolution = 0.5
-            elif 1e5 <= self.youngs < 5e5:
-                self.force_record_resolution = 1.0
-            elif 5e5 <= self.youngs < 1e6:
-                self.force_record_resolution = 2.0
-            else:
-                self.force_record_resolution = 5.0
-                                
-            self.curr_recording_force = 0.0
-            self.recorded_force_count = 0
 
-            self.desired_force = self.max_recorded_force + 5   #16.0#1.0            
-            self.max_force_allowed = self.max_recorded_force + 5   #16.0
+            if self.cfg['data_recording']['is_evaluating']:
+                switch_dict = {
+                    "mustard_bottle": 20.0,
+                    "strawberry02": 7.0,
+                    "lemon02": 7.0,
+                }
+                self.desired_force = switch_dict.get(self.obj_name, None)
+                self.max_force_allowed = self.desired_force + 5.0
+                print_color(f"desired force: {self.desired_force}")
+
+            else:
+                self.max_recorded_force = 60.0
+            
+                if 1e3 <= self.youngs < 1e4:
+                    self.force_record_resolution = 0.25     #0.1
+                    self.max_recorded_force = 15.0
+                elif 1e4 <= self.youngs < 1e5:
+                    self.force_record_resolution = 0.5
+                elif 1e5 <= self.youngs < 5e5:
+                    self.force_record_resolution = 1.0
+                elif 5e5 <= self.youngs < 1e6:
+                    self.force_record_resolution = 2.0
+                else:
+                    self.force_record_resolution = 5.0
+                                    
+                self.curr_recording_force = 0.0
+                self.recorded_force_count = 0
+
+                self.desired_force = self.max_recorded_force + 5   #16.0#1.0            
+                self.max_force_allowed = self.max_recorded_force + 5   #16.0
+
+            
 
             # self.FOS /= 100
 
@@ -1201,16 +1215,11 @@ class PandaFsm:
             # ) and not self.squeezed_until_force and squeeze_guard and np.all(
             #         particles_contacting_gripper > 0):
             
-            if self.f_moving_average[-1] >= self.curr_recording_force + 5.0:  #+ 3.0:    # abrupt change in force
-                print_color("Abrupt change in force. Stop simulation.")
-                self.state = "done"
 
-            if self.state != "done" and self.f_moving_average[-1] >= self.curr_recording_force:
 
-                print_color(f"\n xxxxxx success {self.curr_recording_force}N \n") 
-
-                if self.cfg['data_recording']['is_recording']:
-                    data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.recorded_force_count}.pickle")
+            if self.cfg['data_recording']['is_evaluating']:
+                if abs(self.f_moving_average[-1] - self.desired_force) <= 0.25:
+                    data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{0}.pickle")
                     
                     force_fingers_joint_angles = [self.franka_dof_states['pos'][-3:][1], 
                                                     self.franka_dof_states['pos'][-3:][2]]
@@ -1219,47 +1228,70 @@ class PandaFsm:
                                                 self.f_moving_average[-1], self.grasp_pose, 
                                                 self.pre_squeeze_fingers_joint_angles,
                                                 force_fingers_joint_angles,
-                                                self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
-                    self.recorded_force_count += 1
-
-                self.curr_recording_force += self.force_record_resolution   #0.25
-                
-                if self.curr_recording_force > self.max_recorded_force:
+                                                self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.                    
                     self.state = "done"
-                              
-                # self.state = "done" # collect unseen objects FIX
 
-                # if self.mode == "reorient":
-                #     assert (self.inferred_rot_force)
-                # self.squeezed_until_force = True
 
-                # # Record measurements once force is reached
-                # self.positions_at_force = np.copy(
-                #     self.particle_state_tensor.numpy()
-                #     [self.env_id * self.state_tensor_length:(self.env_id + 1)
-                #      * self.state_tensor_length, :])[:, :3]
-                # self.gripper_force_at_force = np.sum(F_curr)
-                # self.gripper_distance_at_force = np.sum(
-                #     self.grippers_pre_squeeze) - curr_separation
-                # self.get_contact_geometry_features()
-                # stresses_at_force, self.se_at_force, _, _ = tet_based_metrics.get_tet_based_metrics(
-                #     self.gym_handle, self.sim_handle, self.env_handles,
-                #     self.env_id, self.particle_state_tensor, self.youngs)
-                # self.stresses_at_force = stresses_at_force[self.env_id]
+            else:
+                if self.f_moving_average[-1] >= self.curr_recording_force + 5.0:  #+ 3.0:    # abrupt change in force
+                    print_color("Abrupt change in force. Stop simulation.")
+                    self.state = "done"    
 
-                # self.f_errs = np.ones(10)
-                # curr_joint_positions = self.gym_handle.get_actor_dof_states(
-                #     self.env_handle, self.platform_handle, gymapi.STATE_ALL)
+                if self.state != "done" and self.f_moving_average[-1] >= self.curr_recording_force:
 
-                # # Record location of gripper fingers
-                # mid_fk_map = panda_fk.get_fk(self.franka_dof_states['pos'],
-                #                              self.hand_origin,
-                #                              mode="mid")
-                # self.mid_finger_position_transformed = mid_fk_map.dot(
-                #     self.mid_finger_position)[:3]
+                    print_color(f"\n xxxxxx success {self.curr_recording_force}N \n") 
 
-                # print("Platform lower")
-                # self.state = "done"
+                    if self.cfg['data_recording']['is_recording']:
+                        data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{self.recorded_force_count}.pickle")
+                        
+                        force_fingers_joint_angles = [self.franka_dof_states['pos'][-3:][1], 
+                                                        self.franka_dof_states['pos'][-3:][2]]
+                        
+                        record_data_stress_prediction(data_file_name, self.gym_handle, self.sim_handle, 
+                                                    self.f_moving_average[-1], self.grasp_pose, 
+                                                    self.pre_squeeze_fingers_joint_angles,
+                                                    force_fingers_joint_angles,
+                                                    self.object_name, self.young_modulus, self.object_scale)    # self.franka_dof_states['pos'][-3:][1]: left finger joint angle, [2]: right finger.
+                        self.recorded_force_count += 1
+
+                    self.curr_recording_force += self.force_record_resolution   #0.25
+                    
+                    if self.curr_recording_force > self.max_recorded_force:
+                        self.state = "done"
+                                
+                    # self.state = "done" # collect unseen objects FIX
+
+                    # if self.mode == "reorient":
+                    #     assert (self.inferred_rot_force)
+                    # self.squeezed_until_force = True
+
+                    # # Record measurements once force is reached
+                    # self.positions_at_force = np.copy(
+                    #     self.particle_state_tensor.numpy()
+                    #     [self.env_id * self.state_tensor_length:(self.env_id + 1)
+                    #      * self.state_tensor_length, :])[:, :3]
+                    # self.gripper_force_at_force = np.sum(F_curr)
+                    # self.gripper_distance_at_force = np.sum(
+                    #     self.grippers_pre_squeeze) - curr_separation
+                    # self.get_contact_geometry_features()
+                    # stresses_at_force, self.se_at_force, _, _ = tet_based_metrics.get_tet_based_metrics(
+                    #     self.gym_handle, self.sim_handle, self.env_handles,
+                    #     self.env_id, self.particle_state_tensor, self.youngs)
+                    # self.stresses_at_force = stresses_at_force[self.env_id]
+
+                    # self.f_errs = np.ones(10)
+                    # curr_joint_positions = self.gym_handle.get_actor_dof_states(
+                    #     self.env_handle, self.platform_handle, gymapi.STATE_ALL)
+
+                    # # Record location of gripper fingers
+                    # mid_fk_map = panda_fk.get_fk(self.franka_dof_states['pos'],
+                    #                              self.hand_origin,
+                    #                              mode="mid")
+                    # self.mid_finger_position_transformed = mid_fk_map.dot(
+                    #     self.mid_finger_position)[:3]
+
+                    # print("Platform lower")
+                    # self.state = "done"
 
        
 

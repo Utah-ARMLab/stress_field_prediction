@@ -539,11 +539,11 @@ def collision_free_grasps(
             gripper, object_mesh, **tmp
         )
 
-        logging.info(
-            f"Collision-free: {sum(~in_collision)}/{tmp_len},  \
-            Non-empty closing region: {sum(closing_region_nonempty)}/{tmp_len},   \
-            Both: {sum(closing_region_nonempty & ~in_collision)}"
-        )
+        # logging.info(
+        #     f"Collision-free: {sum(~in_collision)}/{tmp_len},  \
+        #     Non-empty closing region: {sum(closing_region_nonempty)}/{tmp_len},   \
+        #     Both: {sum(closing_region_nonempty & ~in_collision)}"
+        # )
 
         grasps = np.array(tmp["poses"])
         results.extend(grasps[closing_region_nonempty & ~in_collision].tolist())

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>    
+
+        <robot name="crystal_hot_sauce">
+            <link name="crystal_hot_sauce">    
+                <fem>
+                    <origin rpy="0.0 0.0 0.0" xyz="0 0 0" />
+                    <density value="1000" />
+                    <youngs value="6.72e03"/>
+                    <poissons value="0.3"/>
+                    <damping value="0.0" />
+                    <attachDistance value="0.0"/>
+                    <tetmesh filename="crystal_hot_sauce.tet"/>
+                    <scale value="1"/>
+                </fem>
+            </link>
+
+        </robot>
+        

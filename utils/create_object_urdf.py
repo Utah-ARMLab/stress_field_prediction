@@ -1,20 +1,23 @@
 import os
-from constants import OBJECT_NAMES
+import numpy as np
 
 
 density = 1000
-youngs = "5e4"   #1e4
+youngs = "5e4"
 poissons = 0.3
 attach_dist = 0.0
 scale = 1
 
-for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:
+
+selected_objects = ["strawberry02", "lemon02", "mustard_bottle"]
+
+for object_name in selected_objects:
 
     object_urdf_path = f"../sim_data/stress_prediction_data/dgn_dataset_varying_stiffness/{object_name}"
 
     os.makedirs(object_urdf_path,exist_ok=True)
- 
-    cur_urdf_path = object_urdf_path + "/soft_body.urdf"
+       
+    cur_urdf_path = object_urdf_path + f"/evaluate_soft_body.urdf"
     f = open(cur_urdf_path, 'w')
 
     urdf_str = f"""<?xml version="1.0" encoding="utf-8"?>    
@@ -39,4 +42,4 @@ for object_name in [f"box0{j}" for j in [1,2,3,4,5,6,7]]:
     f.write(urdf_str)
     f.close()
 
-# <youngs value="{round(youngs)}"/>
+

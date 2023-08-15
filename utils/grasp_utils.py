@@ -27,6 +27,7 @@ def find_folder_directory(folder_name):
 
 def sample_grasps(object_asset, cls_sampler="AntipodalSampler", object_scale=1, number_of_grasps=50, 
                   visualization=False, vis_gripper_name='panda', 
+                  save_grasps_dir=None,
                   **surface_reconstruction_params):
 
     """
@@ -40,6 +41,7 @@ def sample_grasps(object_asset, cls_sampler="AntipodalSampler", object_scale=1, 
         cls_sampler: type of sampling scheme. For example: AntipodalSampler, SurfaceApproachSampler. For more sampling schemes, refer to sampling.py.
         vis_gripper_name: for visualization purpose only. The gripper name that you want to use to 
                         visualize the sampled grasps. Options: 'panda', 'panda_tube'.
+        save_grasps_dir: if is not None, export the sampled grasps to an h5 file.              
 
     Returns:
         results (dict): results["poses"] contains all the sampled grasp.
@@ -107,9 +109,13 @@ def sample_grasps(object_asset, cls_sampler="AntipodalSampler", object_scale=1, 
     
     
     ### Visualize sampled grasps on a test object.
-    if visualization:
-       
+    if visualization:       
         scene = visualize.create_scene(object_mesh, vis_gripper_name, **results)
         scene.show()
+
+    if save_grasps_dir is not None:
+        ### Save sampled grasps to a h5 file.
+        h5_writer = io.H5Writer(save_grasps_dir)
+        h5_writer.write(**results)        
 
     return results 

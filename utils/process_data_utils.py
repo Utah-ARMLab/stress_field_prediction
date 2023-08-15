@@ -222,14 +222,22 @@ def sample_points_gaussian_3(object_mesh, num_pts, scales=[1.5, 1.5, 1.5], toler
 
     # Sample epsilon and shift the surface points in the direction of the normal vectors.
     sigma = max(extended_dimensions - dimensions) / 2
-    surface_points, faces = trimesh.sample.sample_surface_even(object_mesh, count=round(num_pts*1.5))
-    normals = object_mesh.face_normals[faces]
-    dist = halfnorm(scale=sigma)
-    epsilon = dist.rvs(size=surface_points.shape[0])  # distance epsilon to shift the surface points. Epsilon is sampled of a half-gaussian distribution. https://stats.stackexchange.com/questions/603768/how-do-you-sample-from-a-half-normal-distribution-in-python
-    noisy_points = surface_points + epsilon[:, np.newaxis] * normals
+    
+    enough_query_pts = False
+    num_qr_pts = num_pts*1.5
+    while(not enough_query_pts):
+        surface_points, faces = trimesh.sample.sample_surface_even(object_mesh, count=round(num_qr_pts))
+        normals = object_mesh.face_normals[faces]
+        dist = halfnorm(scale=sigma)
+        epsilon = dist.rvs(size=surface_points.shape[0])  # distance epsilon to shift the surface points. Epsilon is sampled of a half-gaussian distribution. https://stats.stackexchange.com/questions/603768/how-do-you-sample-from-a-half-normal-distribution-in-python
+        noisy_points = surface_points + epsilon[:, np.newaxis] * normals
 
-    signed_distances_noisy_points = trimesh.proximity.signed_distance(object_mesh, noisy_points)
-    is_inside = signed_distances_noisy_points >= -tolerance
+        signed_distances_noisy_points = trimesh.proximity.signed_distance(object_mesh, noisy_points)
+        is_inside = signed_distances_noisy_points >= -tolerance
+        
+        enough_query_pts = sum(is_inside==False) >= num_pts
+        num_qr_pts *= 1.3
+    
     
     return noisy_points[np.where(is_inside==False)[0]][:num_pts]
 

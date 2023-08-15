@@ -3,7 +3,7 @@ import numpy as np
 from copy import deepcopy
 from sklearn.neighbors import NearestNeighbors
 import matplotlib.pyplot as plt
-import pickle
+import pickle5 as pickle
 import os
 
 

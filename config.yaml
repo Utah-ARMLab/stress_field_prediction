@@ -23,7 +23,10 @@ dir:
 
 data_recording:
   is_recording: True
-  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives'
+  is_evaluating: True
+  
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/evaluate'
+  
 
 miscellaneous:
   force_debug: False
