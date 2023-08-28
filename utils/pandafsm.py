@@ -900,6 +900,7 @@ class PandaFsm:
                     "mustard_bottle": 20.0,
                     "strawberry02": 7.0,
                     "lemon02": 7.0,
+                    "box01": 10.0,
                 }
                 self.desired_force = switch_dict.get(self.obj_name, None)
                 self.max_force_allowed = self.desired_force + 5.0

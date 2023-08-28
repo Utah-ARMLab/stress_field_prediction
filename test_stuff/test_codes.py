@@ -1,9 +1,16 @@
 import torch
+import numpy as np
+import mcubes
+# X, Y, Z = np.mgrid[:30, :30, :30]
+# u = (X-15)**2 + (Y-15)**2 + (Z-15)**2 - 8**2
+# print(X.shape, Y.shape, Z.shape)
+# print(u.shape)
+# print(u)
 
-
-x = torch.tensor([[1,2,3],[4,5,6]]) # shape (B, 256)
-print(x.shape)
-print(x)
-
-x = x.unsqueeze(1).repeat(1, 5, 1) # shape (B, num_qrs, 256)
-print(x)
+X, Y = np.mgrid[:10, :10]
+u = (X)**2 + (Y)**2
+# print(X.shape, Y.shape)
+# print(u.shape)
+print(X)
+print(Y)
+print(u)

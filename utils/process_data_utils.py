@@ -8,9 +8,10 @@ import open3d
 import numpy as np
 from scipy.stats import halfnorm
 
-def get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=1024, gripper_name='panda', finger_only=True):
+def get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=1024, gripper_name='panda', finger_only=True,
+                            franka_gripper_mesh_main_path="../graspsampling-py-defgraspsim"):
     gripper = create_gripper(gripper_name, configuration=fingers_joint_angles, 
-                             franka_gripper_mesh_main_path="../graspsampling-py-defgraspsim", finger_only=finger_only)
+                             franka_gripper_mesh_main_path=franka_gripper_mesh_main_path, finger_only=finger_only)
     transformation_matrix = poses_wxyz_to_mats(grasp_pose)[0]
     mesh = gripper.mesh.copy()
     mesh.apply_transform(transformation_matrix)
@@ -336,7 +337,7 @@ def Tetrahedron_vectorized(vertices):
     """
     origin = vertices[:,:1,:]
     rest = vertices[:,1:,:]
-    mat = (np.array(rest) - origin)
+    mat = (rest - origin)
     tetra = np.linalg.inv(mat)
     return tetra.transpose((0,2,1)), origin
 
@@ -351,6 +352,15 @@ def pointInside_vectorized(point, tetra, origin):
 
 
 def is_inside_tet_mesh_vectorized(points, vertices, tet_indices):
+    # try:
+    #     import cupy as np
+    #     points =  np.asarray(points)
+    #     vertices =  np.asarray(vertices)
+    #     tet_indices =  np.asarray(tet_indices)
+    #     print("Using cupy ...")
+    # except ImportError:
+    #     import numpy as np
+    #     print("No cupy available. Using numpy ...")
     """ 
     Whether a set of points belong to the tetrahedral mesh volume.
     Original implementation: https://stackoverflow.com/questions/25179693/how-to-check-whether-the-point-is-in-the-tetrahedron-or-not/60745339#60745339      

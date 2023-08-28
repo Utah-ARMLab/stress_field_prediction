@@ -6,7 +6,9 @@ import timeit
 import sys
 import argparse
 import re
-import isaacgym
+
+
+
 sys.path.append("../")
 from utils.process_data_utils import *
 from utils.miscellaneous_utils import pcd_ize, down_sampling, write_pickle_data, print_color
@@ -14,10 +16,13 @@ from utils.stress_utils import *
 from utils.point_cloud_utils import transform_point_cloud
 from utils.mesh_utils import sample_points_from_tet_mesh
 from utils.constants import OBJECT_NAMES
+import random
 
 """ 
 Process data collected by Bao.
 """
+
+
 
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
 
@@ -35,13 +40,16 @@ selected_objects = []
 # selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,10)] \
 #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
 
-selected_objects += [f"box0{j}" for j in range(9,10)]
+# selected_objects += ["bleach_cleanser"] #[f"cylinder0{j}" for j in range(4,5)]
+selected_objects += [f"hemi0{j}" for j in [1]]
 
 
 start_time = timeit.default_timer() 
 visualization = False
 process_gripper_only = False
 save_gripper_data = True
+stress_visualization_min = np.log(1e2)  # 1e3
+stress_visualization_max = np.log(1e5)  # 5e4 1e4
 
 num_pts = 1024
 num_query_pts = 2000
@@ -79,14 +87,14 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
         
         get_gripper_pc = True
         
-        # for force_idx in [0,30]:
+        # for force_idx in [0]:
         for force_idx in range(0,121):
             
             # print(f"{object_name} - grasp {grasp_idx} - force {force_idx} started")
             
             file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{grasp_idx}_force_{force_idx}.pickle")
             if not os.path.isfile(file_name):
-                # print_color(f"{file_name} not found")
+                print_color(f"{file_name} not found")
                 break   
             
             with open(file_name, 'rb') as handle:
@@ -118,36 +126,51 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
                 # gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
                 gripper_pc = get_gripper_point_cloud(grasp_pose, [0.04,0.04], num_pts=num_pts)
                 
+                
+                transformed_gripper_pcs = []
+                for i in range(8):
+                    transformed_gripper_pcs.append(transform_point_cloud(gripper_pc, homo_mats[i])[np.newaxis, :]) 
+                transformed_gripper_pcs = np.concatenate(tuple(transformed_gripper_pcs), axis=0)     
+    
                 if save_gripper_data:
-                    transformed_gripper_pcs = []
-                    for i in range(8):
-                        transformed_gripper_pcs.append(transform_point_cloud(gripper_pc, homo_mats[i])[np.newaxis, :]) 
-                    transformed_gripper_pcs = np.concatenate(tuple(transformed_gripper_pcs), axis=0)     
-                    # print(transformed_gripper_pcs.shape)  
-
                     gripper_data = {"gripper_pc": gripper_pc, "transformed_gripper_pcs": transformed_gripper_pcs}
                     save_path = os.path.join(gripper_pc_recording_path, f"{object_name}_grasp_{grasp_idx}.pickle")
                     write_pickle_data(gripper_data, save_path)
                 
                 get_gripper_pc = False
-            
-            
-            if visualization:
 
-                # pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
-                pcd_full = pcd_ize(object_particle_state, color=[1,0,0])
-                pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
-
-                # open3d.visualization.draw_geometries([pcd_partial, pcd_full, pcd_gripper])
-                open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
-
-            if process_gripper_only:
-                break
 
             full_pc = object_particle_state            
             object_mesh = trimesh.Trimesh(vertices=full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))  # reconstruct the surface mesh.
             all_stresses = np.log(compute_all_stresses(tet_stress, adjacent_tetrahedral_dict, full_pc.shape[0]))    # np.log needs fixing, e.g. np.log(0.0) undefined 
             # all_stresses = np.random.uniform(size=full_pc.shape[0])
+
+            
+            if visualization:
+
+                # pcd_partial = pcd_ize(partial_pcs[0], color=[0,0,0])
+                pcd_full = pcd_ize(object_particle_state, color=[1,0,0])
+                colors = np.array(scalar_to_rgb(all_stresses, colormap='jet', min_val=stress_visualization_min, max_val=stress_visualization_max))[:,:3]
+                pcd_full.colors = open3d.utility.Vector3dVector(colors)
+
+                pcd_gripper = pcd_ize(gripper_pc, color=[0,1,0])
+
+                # pcd_gripper_1 = pcd_ize(transform_point_cloud(gripper_pc, homo_mats[0]), color=[0,0,0])
+                # pcd_gripper_2 = pcd_ize(transformed_gripper_pcs[0], color=[1,0,0])
+                # open3d.visualization.draw_geometries([pcd_gripper_1, pcd_gripper_2])
+
+                pcd_gripper_1 = pcd_ize(transform_point_cloud(gripper_data["gripper_pc"], homo_mats[0]), color=[0,0,0])
+                pcd_gripper_3 = pcd_ize(gripper_data["gripper_pc"], color=[0,0,1])
+                pcd_gripper_2 = pcd_ize(gripper_data["transformed_gripper_pcs"][0], color=[1,0,0])
+                open3d.visualization.draw_geometries([pcd_gripper_1, pcd_gripper_2, pcd_gripper_3])
+
+                # # open3d.visualization.draw_geometries([pcd_partial, pcd_full, pcd_gripper])
+                # open3d.visualization.draw_geometries([pcd_full, pcd_gripper])
+
+            if process_gripper_only:
+                break
+
+
 
             # pcd_gripper = pcd_ize(gripper_pc, color=[0,0,0])
             # pcd = pcd_ize(full_pc, color=[0,0,0])

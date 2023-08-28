@@ -8,7 +8,7 @@ from utils.miscellaneous_utils import print_color
 # os.chdir(pkg_path)
 
 start_time = timeit.default_timer() 
-grasp_idx_bounds = range(0, 20)     # range(0, 100)
+grasp_idx_bounds = range(50, 100)     # range(0, 100)
 
 selected_objects = []
 # selected_objects += \
@@ -21,13 +21,13 @@ selected_objects = []
 # selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,8)] \
 #                 + [f"ellipsoid0{j}" for j in [1,2,3,4]] + [f"sphere0{j}" for j in [1,3,4,6]]
 # selected_objects += ["box08", "box09", "ellipsoid05"]
-selected_objects += ["mustard_bottle", "strawberry02", "lemon02"]  # , "mustard_bottle", "strawberry02", "lemon02"
+selected_objects += ["hemi01"]  # , "mustard_bottle", "strawberry02", "lemon02"
 
 
 # for object_name in selected_objects:
 #     for grasp_idx in grasp_idx_bounds:
         
-#         grasp_idx = np.random.choice(100, size=None, replace=False)
+#         # grasp_idx = np.random.choice(100, size=None, replace=False)
 
 #         print_color(f"===================== Started {object_name} - grasp {grasp_idx}")
         

@@ -23,9 +23,9 @@ dir:
 
 data_recording:
   is_recording: True
-  is_evaluating: True
+  is_evaluating: False
   
-  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/evaluate'
+  data_recording_path: '/home/baothach/shape_servo_data/stress_field_prediction/all_primitives'
   
 
 miscellaneous:

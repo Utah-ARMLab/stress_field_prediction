@@ -222,17 +222,18 @@ def world_to_object_frame(points):
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"  # _original
 
 ### Get static data
-object_name = "6polygon04"  #6polygon04 ellipsoid01
+object_name = "hemi01"  #6polygon04 ellipsoid01
 with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
     static_data = pickle.load(handle)
 partial_pcs = static_data["partial_pcs"]  # shape (8, num_pts, 3)
+pcd_partial = pcd_ize(np.concatenate(tuple(partial_pcs), axis=0), color=[0,0,0])
 
 coor_objects = []
 
-for i in range(8):
+for i in range(1):
     print(f"View {i}")
     pc = partial_pcs[i] #+ np.array([0.2,0,0])
-    pc = apply_random_transformation(pc)
+    # pc = apply_random_transformation(pc)
 
     coor_global = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.04)
 
@@ -246,12 +247,12 @@ for i in range(8):
     homo_mat = world_to_object_frame(pc)
     pc_transformed = transform_point_cloud(pc, homo_mat)
     pcd_transformed = pcd_ize(pc_transformed, color=[1,0,0])
-    open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global])
+    open3d.visualization.draw_geometries([pcd, pcd_transformed, coor_global, coor_object])
     # open3d.visualization.draw_geometries([coor_global, coor_object, pcd])
     # # # open3d.visualization.draw_geometries([pcd, coor_object])
     
     coor_objects.append(coor_object)
-    
+coor_objects.append(pcd_partial)    
 # open3d.visualization.draw_geometries(coor_objects) 
     
 
