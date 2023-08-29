@@ -38,7 +38,8 @@ selected_objects = []
 
 # "mustard_bottle"
 
-selected_objects += [f"lemon02", "hemi01"]
+# selected_objects += [f"lemon02", "hemi01"]
+selected_objects += [f"box08", "mustard_bottle"]
 
 pcds = []
 trimesh_pcs = []
@@ -54,26 +55,28 @@ for idx, file_name in enumerate(selected_objects):
     homo_mats = static_data["homo_mats"]
     tet_indices = static_data["tet_indices"]
     
-    partial_pcs = static_data["partial_pcs"]  
-    pc = partial_pcs[3]
-    pc -= np.mean(pc, axis=0)
+    # partial_pcs = static_data["partial_pcs"]  
+    # pc = partial_pcs[3]
     
-    # partial_pcs = static_data["transformed_partial_pcs"]  
-    # pc = partial_pcs[0] 
     
-    # pcds.append(pcd_ize(pc))
+    partial_pcs = static_data["transformed_partial_pcs"]  
+    pc = partial_pcs[0] 
+    
+    # pc -= np.mean(pc, axis=0)
+    
+    pcds.append(pcd_ize(pc))
 
-    homo_mat = world_to_object_frame(pc)
-    trimesh_pc = trimesh.PointCloud(pc)
-    trimesh_pc.apply_transform(homo_mat)
-    trimesh_pcs.append(trimesh_pc)
-    # trimesh_pc.show()
+    # homo_mat = world_to_object_frame(pc)
+    # trimesh_pc = trimesh.PointCloud(pc)
+    # trimesh_pc.apply_transform(homo_mat)
+    # trimesh_pcs.append(trimesh_pc)
+    # # trimesh_pc.show()
     
     
     
-# pcds[0].paint_uniform_color([0,0,0])
-# pcds[1].paint_uniform_color([1,0,0])
-# open3d.visualization.draw_geometries(pcds)
+pcds[0].paint_uniform_color([0,0,0])
+pcds[1].paint_uniform_color([1,0,0])
+open3d.visualization.draw_geometries(pcds)
 
-trimesh_pcs[0].apply_translation([0.05,0,0])
-trimesh.Scene(trimesh_pcs).show()
+# trimesh_pcs[0].apply_translation([0.05,0,0])
+# trimesh.Scene(trimesh_pcs).show()

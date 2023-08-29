@@ -43,9 +43,9 @@ grasp_idx_bounds = [0, 100]
 
 
 device = torch.device("cuda")
-# model = StressNet2(num_channels=5).to(device)
+# model = StressNet2(num_channels=5, joint_training=joint_training).to(device)
 model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder, joint_training=joint_training).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ_8_views/epoch 100"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ_100_views_22_objects/epoch 33"))
 model.eval()
 
 
@@ -68,9 +68,9 @@ selected_objects = []
 # selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,10)] \
 #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
 
-# "mustard_bottle"
+# "mustard_bottle" lemon02 strawberry02
 
-selected_objects += [f"lemon02"]
+selected_objects += [f"mustard_bottle"]
 
 for idx, file_name in enumerate(selected_objects):
     object_name = os.path.splitext(file_name)[0]
@@ -85,7 +85,7 @@ for idx, file_name in enumerate(selected_objects):
     tet_indices = static_data["tet_indices"]
     
     partial_pcs = static_data["transformed_partial_pcs"]
-    pc_idx = 0
+    pc_idx = 2
     partial_pc = partial_pcs[pc_idx:pc_idx+1,:,:]
     # partial_pc *= 1./2
     
@@ -207,7 +207,7 @@ for idx, file_name in enumerate(selected_objects):
                 pred_stress = np.ones(query.shape[0]) * stress_visualization_min
            
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
+            occupied_idxs = np.where(pred_occupancy >= 0.5)[0]
 
             # pcd_gt = pcd_ize(transform_point_cloud(full_pc, homo_mats[pc_idx]), color=[1,0,0])  # transform ground truth full_pc from world frame to object frame.
             # colors = np.array(scalar_to_rgb(gt_stress, colormap='jet', min_val=stress_visualization_min, max_val=stress_visualization_max))[:,:3]
@@ -249,7 +249,7 @@ for idx, file_name in enumerate(selected_objects):
                 # open3d.visualization.draw_geometries([pcd.translate((-0.12,0.00,0)), deepcopy(pcd_gripper).translate((-0.12,0.00,0)), pcd_gt, pcd_gripper]) 
                 if use_open_gripper:
 
-                    translation = (-0.00,0.00,0)   
+                    translation = (-0.1,0.00,0)   
                     temp_pcd_gripper_open = deepcopy(pcd_gripper_open).translate(translation)
                     temp_pcd_gripper_open.paint_uniform_color([0,0,1])
                     pcd.paint_uniform_color([0,0,0])
@@ -258,7 +258,7 @@ for idx, file_name in enumerate(selected_objects):
  
 
                     open3d.visualization.draw_geometries([pcd.translate(translation), temp_pcd_gripper_open, 
-                                                        pcd_gt, pcd_gripper_open])   
+                                                        pcd_gt, pcd_gripper_open, pcd_partial.translate(translation)])   
 
            
                

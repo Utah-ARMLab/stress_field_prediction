@@ -34,11 +34,11 @@ from utils import uniform_sphere
 from utils import metrics_features_utils
 from utils.miscellaneous_utils import get_object_particle_state, pcd_ize, print_color, down_sampling
 from utils.camera_utils import *
-from utils.point_cloud_utils import world_to_object_frame, transform_point_cloud
+from utils.point_cloud_utils import world_to_object_frame, transform_point_cloud, transform_point_clouds
 from utils.stress_utils import get_adjacent_tetrahedrals_of_vertex
 from isaacgym import gymtorch
 import pickle
-
+# np.random.seed(2020)
 
 # python3 run_grasp_evaluation.py --object=rectangle --grasp_ind=3 --youngs=2e3 --density=1000 --ori_start=10 --ori_end=10 --mode=pickup
 
@@ -284,30 +284,38 @@ class StaticDataCollection:
         cam_pos_z = self.max_z_object + 0.03 #self.cfg['sim_params']['platform_height'] + 0.03
         print_color(f"object height: {self.max_z_object * 2}")
         
+        def sample_points_on_circle(radius, num_points):
+            thetas = np.random.uniform(0, 2 * np.pi, num_points)
+            x_coords = radius * np.cos(thetas)
+            y_coords = radius * np.sin(thetas)
+            
+            points = np.column_stack((x_coords, y_coords))
+            
+            return points
         
+        camera_positions = sample_points_on_circle(radius=0.1, num_points=100)
         
-        if self.object_name in [f"cuboid0{j}" for j in [4,5]]:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 2     
-        elif self.object_name in ["cuboid06"]:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 2.5
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 2.5                   
-        elif self.object_name in [f"box0{j}" for j in [6]]:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 1.2
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.2  
+                 
+        if self.object_name in [f"box0{j}" for j in [6]]:
+            camera_positions *= 1.2
         elif self.object_name in [f"box0{j}" for j in [7]]:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 1.5
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.5              
+            camera_positions *= 1.5           
         elif self.object_name in ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol", "box08"]:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) * 1.5
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) * 1.5    
+            camera_positions *= 1.5   
             cam_pos_z = self.max_z_object + 0.06
         else:
-            cam_pos_xs = np.array([-0.1,-0.1,-0.1, 0,0, 0.1,0.1,0.1]) #* 0.5
-            cam_pos_ys = np.array([-0.1,0,0.1, -0.1,0.1, -0.1,0,0.1]) #* 0.5
+            pass
+
+
+        cam_pos_xs = []
+        cam_pos_ys = []
+        for camera_pos in camera_positions:
+            cam_pos_xs.append(camera_pos[0])
+            cam_pos_ys.append(camera_pos[1])
+
 
         if any([name in self.object_name for name in self.exclusive_objects]):
-           
+        
             print_color(f"object_centroid: {self.object_centroid}")
             
             cam_pos_xs += self.object_centroid[0]  
@@ -447,13 +455,14 @@ class StaticDataCollection:
             frame_count += 1
             if frame_count == 2:
                 # # output_file = "/home/baothach/Downloads/test_cam_views.png"
-                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}.png"
+                output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views_2/{self.object_name}.png"
 
                 
                 visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], 
+                                    output_file=output_file, num_columns=10)
 
-                static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
+                static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/partial_pcs_dataset"
                 os.makedirs(static_data_recording_path, exist_ok=True)
                 segmentationId_dict = {"robot": 11, "platform": 12}
                 partial_pcs = []    # list of 8 point clouds from 8 different camera views
@@ -464,55 +473,25 @@ class StaticDataCollection:
                     partial_pcs.append(down_sampling(partial_pc, num_pts=1024)[np.newaxis, :])  # shape (1,num_pts,3)
 
                 partial_pcs = np.concatenate(tuple(partial_pcs), axis=0)  # shape (8,num_pts,3)
-                # partial_pcs[..., 2] += 1.0  # add 1.0 to each z value of each point cloud (to match with Isabella's data)
-                # partial_pcs[:, :, [1, 2]] = partial_pcs[:, :, [2, 1]]   # swap y and z values (to match with Isabella's data) 
 
-                # pcd_ize(partial_pcs[0], color=[0,0,0], vis=True)
-                # break
-
-                (tri_indices, _, _) = self.gym.get_sim_triangles(self.sim)
-                tri_indices = np.array(tri_indices).reshape(-1,3)   # shape (num_triangles, 3)
-                
-                (tet_indices, _) = self.gym.get_sim_tetrahedra(self.sim)    
-                tet_indices = np.array(tet_indices).reshape(-1,4)   # shape (num_tetrahedra, 4)
-                # print(tri_indices.shape, tet_indices.shape)
-                
+               
                 homo_mats = []  # length partial_pcs.shape[0] or num_cameras
                 for pc in partial_pcs:
                     homo_mats.append(world_to_object_frame(pc)) # transform point clouds in world frame, to point clouds in object frame.
+                homo_mats = np.array(homo_mats)
+                
+                transformed_partial_pcs = transform_point_clouds(partial_pcs, homo_mats)
 
-                transformed_partial_pcs = []
-                for i in range(8):
-                    transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
-                transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
-                # print(transformed_partial_pcs.shape)       
+                # transformed_partial_pcs = []
+                # for i in range(partial_pcs.shape[0]):
+                #     transformed_partial_pcs.append(transform_point_cloud(partial_pcs[i], homo_mats[i])[np.newaxis, :]) 
+                # transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
 
-
-                adjacent_tetrahedral_dict = get_adjacent_tetrahedrals_of_vertex(tet_indices)    
-
-
-                evaluate_objects = ["strawberry02", "lemon02", "mustard_bottle", "box01"]
-                if self.object_name in evaluate_objects:
-                    (_, tet_stress) = self.gym.get_sim_tetrahedra(self.sim)    # tet_stress: shape (num_tetrahedra,)
-
-                    all_cauchy_stresses = []
-                    for cauchy_stress in tet_stress:
-                        cauchy_stress_matrix = np.array([[cauchy_stress.x.x, cauchy_stress.y.x, cauchy_stress.z.x],
-                                                        [cauchy_stress.x.y, cauchy_stress.y.y, cauchy_stress.z.y],
-                                                        [cauchy_stress.x.z, cauchy_stress.y.z, cauchy_stress.z.z]])
-                        all_cauchy_stresses.append(cauchy_stress_matrix) 
-                    all_cauchy_stresses = np.array(all_cauchy_stresses)    # shape (num_tetrahedra, 3, 3)
-
-                    data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
-                            "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
-                            "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict, 
-                            "undeformed_full_pc": get_object_particle_state(self.gym, self.sim),
-                            "undeformed_tet_stress": all_cauchy_stresses}
-
-                else:
-                    data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
-                            "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
-                            "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict}
+                print(transformed_partial_pcs.shape, np.array(homo_mats).shape)
+                
+                data = {"partial_pcs": partial_pcs, "transformed_partial_pcs": transformed_partial_pcs,
+                        "homo_mats": homo_mats}
+                        
                     
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
@@ -523,8 +502,10 @@ class StaticDataCollection:
                 # #     pcds.append(pcd_ize(pc))
                 # # open3d.visualization.draw_geometries(pcds) 
 
-
-
+                # # for test_idx in range(partial_pcs.shape[0]):
+                # #     pcd_test_1 = pcd_ize(transformed_partial_pcs[test_idx], color=[0,0,0], vis=False)
+                # #     pcd_test_2 = pcd_ize(transform_point_cloud(partial_pcs[test_idx], homo_mats[test_idx]), color=[1,0,0], vis=False)
+                # #     open3d.visualization.draw_geometries([pcd_test_1, pcd_test_2])
 
                 all_done = True
                 

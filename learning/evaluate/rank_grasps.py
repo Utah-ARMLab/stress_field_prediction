@@ -138,7 +138,7 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/evaluate"
 
 
-selected_objects =  ["lemon02"]    # ["mustard_bottle", "strawberry02", "lemon02"] "box01"
+selected_objects =  ["mustard_bottle", "strawberry02", "lemon02"]    # ["mustard_bottle", "strawberry02", "lemon02"] "box01"
 
 
 start_time = timeit.default_timer() 
@@ -175,7 +175,7 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
     gt_stress_deltas = []
     chamfer_distances = []
 
-    for idx in range(100):
+    for idx in range(0,100,2):
         file_name = os.path.join(data_processed_path, f"processed sample {idx}.pickle")
         if not os.path.isfile(file_name):
             # print_color(f"{file_name} not found")
@@ -240,19 +240,19 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
     #     chamfer_distances.append(chamfer_distance(recon_full_pc, transform_point_cloud(gt_full_pc, homo_mats[0])))
 
 
-        delta_vis = 0.1 
-        pcd_recon = pcd_ize(query[pred_occupancy >= 0.5], color=[0,0,0])
-        pcd_undeformed_recon = pcd_ize(query[undeformed_pred_occupancy >= 0.5], color=[1,0,0]).translate((delta_vis,0,0))
-        pcd_gt = pcd_ize(query[gt_occupancy >= 0.5], color=[0,1,0]).translate((delta_vis*2,0,0))
-        pcd_undeformed_gt = pcd_ize(query[undeformed_gt_occupancy >= 0.5], color=[0,0,1]).translate((delta_vis*3,0,0))        
-        open3d.visualization.draw_geometries([pcd_recon, pcd_undeformed_recon, pcd_gt, pcd_undeformed_gt])
+        # delta_vis = 0.1 
+        # pcd_recon = pcd_ize(query[pred_occupancy >= 0.5], color=[0,0,0])
+        # pcd_undeformed_recon = pcd_ize(query[undeformed_pred_occupancy >= 0.5], color=[1,0,0]).translate((delta_vis,0,0))
+        # pcd_gt = pcd_ize(query[gt_occupancy >= 0.5], color=[0,1,0]).translate((delta_vis*2,0,0))
+        # pcd_undeformed_gt = pcd_ize(query[undeformed_gt_occupancy >= 0.5], color=[0,0,1]).translate((delta_vis*3,0,0))        
+        # open3d.visualization.draw_geometries([pcd_recon, pcd_undeformed_recon, pcd_gt, pcd_undeformed_gt])
 
         
         # break
         
     kendall_tau = kendall_tau_between_arrays(recon_deformation_deltas, gt_deformation_deltas)
     print("Kendall Tau deformation:", kendall_tau)
-
+    # print(len(recon_deformation_deltas), len(gt_deformation_deltas))
     # a = np.arange(100)
     # b = np.arange(1,101)
     # b[99] = 0

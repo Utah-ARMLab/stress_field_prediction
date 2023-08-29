@@ -9,7 +9,7 @@ np.random.seed(2023)
 mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness"
 
 # selected_objects = ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol", "mustard_bottle"]
-selected_objects = ["hemi01", "hemi02"]    #"mustard_bottle"
+selected_objects = ["lemon02"]    #"mustard_bottle"
 
 meshes = []
 for i, object_name in enumerate(selected_objects):

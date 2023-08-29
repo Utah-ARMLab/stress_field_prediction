@@ -38,14 +38,15 @@ visualization = False
 num_pts = 1024
 num_query_pts = 500000
 use_open_gripper = True
+joint_training = False
 
 grasp_idx_bounds = [0, 100]
 
 
 device = torch.device("cuda")
-# model = StressNet2(num_channels=5).to(device)
-model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder).to(device)
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ/epoch 50"))
+# model = StressNet2(num_channels=5, joint_training=joint_training).to(device)
+model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder, joint_training=joint_training).to(device)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ_100_views_22_objects/epoch 60"))
 model.eval()
 
 
@@ -68,7 +69,7 @@ selected_objects = []
 # selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,10)] \
 #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
 
-# "mustard_bottle"
+# "mustard_bottle" lemon02 strawberry02
 
 selected_objects += [f"strawberry02"]
 
@@ -85,7 +86,7 @@ for idx, file_name in enumerate(selected_objects):
     tet_indices = static_data["tet_indices"]
     
     partial_pcs = static_data["transformed_partial_pcs"]
-    pc_idx = 0
+    pc_idx = 2
     partial_pc = partial_pcs[pc_idx:pc_idx+1,:,:]
     # partial_pc_ori = static_data["partial_pcs"][pc_idx]
 
@@ -137,7 +138,7 @@ for idx, file_name in enumerate(selected_objects):
         pcd_gripper = pcd_ize(gripper_pc.squeeze(), color=(0,0,0))
 
         ### Sample query points
-        query = sample_points_bounding_box(trimesh.PointCloud(partial_pc.squeeze()), num_query_pts, scales=[4]*3)  # shape (num_query_pts,3) 
+        # query = sample_points_bounding_box(trimesh.PointCloud(partial_pc.squeeze()), num_query_pts, scales=[4]*3)  # shape (num_query_pts,3) 
 
 
         pcds = []
@@ -177,6 +178,8 @@ for idx, file_name in enumerate(selected_objects):
             tet_stress = data["tet_stress"]
             gt_stress = np.log(compute_all_stresses(tet_stress, adjacent_tetrahedral_dict, full_pc.shape[0]))
 
+            query = sample_points_bounding_box(trimesh.PointCloud(full_pc), num_query_pts, scales=[1.5]*3)
+            query = transform_point_cloud(query, homo_mats[pc_idx])
             # full_pc_w_stress = np.concatenate((full_pc, gt_stress[:, np.newaxis]), axis=1)      
             # points_from_tet_mesh = sample_points_from_tet_mesh(full_pc_w_stress[tet_indices], k=4)   # sample points from the volumetric mesh
             # print(full_pc.shape, points_from_tet_mesh.shape)
@@ -197,13 +200,15 @@ for idx, file_name in enumerate(selected_objects):
             
             query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
             query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
-            stress, occupancy = model(combined_pc_tensor, query_tensor)
-
-
-            pred_stress = stress.squeeze().cpu().detach().numpy()
+            if joint_training:
+                stress, occupancy = model(combined_pc_tensor, query_tensor)
+                pred_stress = stress.squeeze().cpu().detach().numpy()
+            else:
+                occupancy = model(combined_pc_tensor, query_tensor)
+                pred_stress = np.ones(query.shape[0]) * stress_visualization_min
+           
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-            occupied_idxs = np.where(pred_occupancy >= 0.99)[0]
-
+            occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
             # pcd_gt = pcd_ize(transform_point_cloud(full_pc, homo_mats[pc_idx]), color=[1,0,0])  # transform ground truth full_pc from world frame to object frame.
             # colors = np.array(scalar_to_rgb(gt_stress, colormap='jet', min_val=stress_visualization_min, max_val=stress_visualization_max))[:,:3]
             
@@ -230,10 +235,34 @@ for idx, file_name in enumerate(selected_objects):
             # # colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=min(gt_stress), max_val=max(gt_stress)))[:,:3]
             # colors = np.array(scalar_to_rgb(pred_stress[occupied_idxs], colormap='jet', min_val=stress_visualization_min, max_val=stress_visualization_max))[:,:3]
             # pcd.colors = open3d.utility.Vector3dVector(colors)
+
+            def inverse_4x4_homogeneous_matrix(matrix):
+                # Extract the upper-left 3x3 submatrix
+                upper_left = matrix[:3, :3]
+
+                # Calculate the inverse of the upper-left 3x3 submatrix
+                upper_left_inv = np.linalg.inv(upper_left)
+
+                # Extract the translation part (rightmost 3x1 column)
+                translation = matrix[:3, 3]
+
+                # Calculate the new translation using the inverse of the upper-left matrix
+                new_translation = -np.dot(upper_left_inv, translation)
+
+                # Construct the inverse matrix
+                inverse_matrix = np.zeros_like(matrix)
+                inverse_matrix[:3, :3] = upper_left_inv
+                inverse_matrix[:3, 3] = new_translation
+                inverse_matrix[3, 3] = 1
+
+                return inverse_matrix
+
+            query = transform_point_cloud(query, inverse_4x4_homogeneous_matrix(homo_mats[pc_idx]))
            
             pcd = pcd_ize(query[occupied_idxs], color=[0,1,0], vis=False)
-            mesh = mise_voxel(query[occupied_idxs], initial_voxel_resolution=32, final_voxel_resolution=32, voxel_size=0.1) # 50
-            mesh.vertices *= 1./35
+            mesh = mise_voxel(query[occupied_idxs], initial_voxel_resolution=32, final_voxel_resolution=32, voxel_size=0.1) # 50 32
+            mesh.vertices -= mesh.center_mass
+            mesh.vertices *= 1./76  # 19 70
             print(trimesh.PointCloud(query[occupied_idxs]- np.mean(query[occupied_idxs], axis=0)).bounds)
             print(mesh.bounds)
             print(mesh.bounds/trimesh.PointCloud(query[occupied_idxs]- np.mean(query[occupied_idxs], axis=0)).bounds)

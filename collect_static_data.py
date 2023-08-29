@@ -26,6 +26,7 @@ python3 collect_static_data.py --object=rectangle
 import argparse
 
 from grasp_evaluator.static_data import StaticDataCollection
+# from grasp_evaluator.partial_pcs_data import StaticDataCollection
 
 # Create command line flag options
 parser = argparse.ArgumentParser(description='Options')

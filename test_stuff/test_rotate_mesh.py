@@ -19,7 +19,7 @@ recon_mesh_path = "/home/baothach/shape_servo_data/stress_field_prediction/resul
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
 
 # selected_objects = ["mustard_bottle", "strawberry02", "lemon02"]
-selected_objects = ["strawberry02"]
+selected_objects = ["mustard_bottle"]
 
 
 meshes = []
@@ -37,11 +37,14 @@ for i, object_name in enumerate(selected_objects):
     # Load a mesh from a file (replace 'your_mesh.stl' with the actual filename)
     mesh = o3d.io.read_triangle_mesh(file_name)
     mesh.compute_vertex_normals()   # compute surface normal to enable shading
-    mesh.transform(homo_mats[0])
+    # mesh.transform(homo_mats[0])
+    mesh.translate(-np.mean(np.asarray(mesh.vertices), axis=0))
     
     file_name = os.path.join(recon_mesh_path, f"{object_name}_recon_mesh.stl")
-    mesh_recon = o3d.io.read_triangle_mesh(file_name).translate((0.1,0,0))
+    mesh_recon = o3d.io.read_triangle_mesh(file_name)
     mesh_recon.compute_vertex_normals()   # compute surface normal to enable shading
+    mesh_recon.translate(-np.mean(np.asarray(mesh_recon.vertices), axis=0))
+    mesh_recon.translate((0.13,0,0))    # 0.1 0.13
 
     # Define the rotation axis (for example, [0, 0, 1] for Z-axis)
     rotation_axis = np.array([0, 0, 1])

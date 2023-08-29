@@ -125,3 +125,25 @@ def transform_point_cloud(point_cloud, transformation_matrix):
     transformed_points = transformed_points[:, :3]
 
     return transformed_points
+
+
+
+def transform_point_clouds(point_clouds, matrices):
+
+    # If there's only one point cloud but multiple matrices, repeat and reshape point cloud to match matrices shape.
+    if len(point_clouds.shape) == 2 and len(matrices.shape) == 3:
+        num_matrices = matrices.shape[0]
+        point_clouds = np.tile(point_clouds, (num_matrices, 1, 1))
+    
+    # If there's both only one point cloud and one matrix, add an extra dimension to both.    
+    elif len(point_clouds.shape) == 2:
+        point_clouds = point_clouds[np.newaxis, ...]
+        matrices = matrices[np.newaxis, ...]
+    
+    # Convert 3D points to homogeneous coordinates
+    homogeneous_points = np.concatenate((point_clouds, np.ones_like(point_clouds[..., :1])), axis=-1)
+   
+    # Perform matrix multiplication for all point clouds at once using broadcasting
+    transformed_points = np.matmul(homogeneous_points, matrices.swapaxes(1, 2))
+    
+    return transformed_points[:,:,:3]

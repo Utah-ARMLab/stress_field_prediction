@@ -405,6 +405,12 @@ class StaticDataCollection:
             pose.p = self.from_trimesh_transform.transform_vector(
                 gymapi.Vec3(0.0, 0.0, 0.0))
 
+            # if self.object_name == "lemon02":
+            #     import transformations
+            #     eulers = [0, np.pi/6, 0]
+            #     quat = transformations.quaternion_from_euler(*eulers)
+            #     pose.r = gymapi.Quat(*quat)
+
             object_height_buffer = 0.001
 
             # pose.p.z += self.cfg['sim_params']['platform_height'] + object_height_buffer  # fix z_up + Bao's original dataset
@@ -450,8 +456,8 @@ class StaticDataCollection:
                 output_file = f"/home/baothach/stress_field_prediction/visualization/figures/camera_views/{self.object_name}.png"
 
                 
-                visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
-                                    resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
+                # visualize_camera_views(self.gym, self.sim, self.env_handles[0], self.cam_handles, \
+                #                     resolution=[self.pc_cam_props.height, self.pc_cam_props.width], output_file=output_file)
 
                 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
                 os.makedirs(static_data_recording_path, exist_ok=True)
@@ -487,9 +493,10 @@ class StaticDataCollection:
                 transformed_partial_pcs = np.concatenate(tuple(transformed_partial_pcs), axis=0) # partial point clouds are now in object frame.     
                 # print(transformed_partial_pcs.shape)       
 
-
                 adjacent_tetrahedral_dict = get_adjacent_tetrahedrals_of_vertex(tet_indices)    
 
+                full_pc = get_object_particle_state(self.gym, self.sim)
+                downsampled_full_pc = down_sampling(full_pc, num_pts=1024)
 
                 evaluate_objects = ["strawberry02", "lemon02", "mustard_bottle", "box01"]
                 if self.object_name in evaluate_objects:
@@ -504,13 +511,15 @@ class StaticDataCollection:
                     all_cauchy_stresses = np.array(all_cauchy_stresses)    # shape (num_tetrahedra, 3, 3)
 
                     data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
+                            "downsampled_mesh_vertices": downsampled_full_pc,
                             "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
                             "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict, 
-                            "undeformed_full_pc": get_object_particle_state(self.gym, self.sim),
+                            "undeformed_full_pc": full_pc,
                             "undeformed_tet_stress": all_cauchy_stresses}
 
                 else:
                     data = {"partial_pcs": partial_pcs, "tri_indices": tri_indices, "tet_indices": tet_indices,
+                            "downsampled_mesh_vertices": downsampled_full_pc,
                             "homo_mats": homo_mats, "transformed_partial_pcs": transformed_partial_pcs,
                             "adjacent_tetrahedral_dict": adjacent_tetrahedral_dict}
                     

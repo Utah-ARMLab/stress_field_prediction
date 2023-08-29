@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
-from model import StressNet2, PointCloudEncoder
-from dataset_loader import StressPredictionObjectFrameDataset, StressPredictionDataset3
+from model import StressNet2, PointCloudEncoderConv1D, PointCloudEncoder
+from dataset_loader import StressPredictionObjectFrameDataset, StressPredictionObjectFrameDataset_2
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -38,10 +38,11 @@ def train(model, device, train_loader, optimizer, epoch):
         pc = sample["pc"].to(device)
         query = sample["query"].to(device)
         target_occupancy = sample["occupancy"].to(device)
+        
+        # print(pc.shape, query.shape, target_occupancy.shape)
                
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-        # num_queries = query.shape[1]
-        # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
+  
 
         pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
@@ -149,10 +150,12 @@ def weights_init(m):
 if __name__ == "__main__":
     torch.manual_seed(2021)
     random.seed(2021)
+
+    
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ_8_views"
+        "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/mesh_cylinders"
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -165,10 +168,11 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data_ssd/stress_field_prediction/all_primitives/processed"
-    gripper_pc_path = "/home/baothach/shape_servo_data_ssd/stress_field_prediction/all_primitives/processed"
-    object_partial_pc_path = "/home/baothach/shape_servo_data_ssd/stress_field_prediction/static_data_original"
-    # object_names = [f"6polygon0{j}" for j in [3,4,5,6,7,8]]     # [3,4,5,6,7,8]
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
+    # object_partial_pc_path = "/home/baothach/shape_servo_data_ssd/stress_field_prediction/static_data_original"
+    object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/partial_pcs_dataset"
+
 
     selected_objects = []
     # selected_objects += \
@@ -181,14 +185,18 @@ if __name__ == "__main__":
     #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
     # selected_objects += [f"hemi0{j}" for j in [1]]
     
-    selected_objects += [f"hemi0{j}" for j in [1]] + [f"ellipsoid0{j}" for j in [1,2,5]] + \
-                        [f"sphere0{j}" for j in [3,4,6]]
+    selected_objects += [f"hemi0{j}" for j in [1]] + \
+                        [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [3,4,6]] + \
+                        [f"box0{j}" for j in [1,2,3,4,8]] + [f"cylinder0{j}" for j in [3,4,5,6,8]] + \
+                        ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol"] 
     
 
-    # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
-    dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, selected_objects, joint_training=False)
+    # dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, selected_objects, joint_training=False)
+    dataset = StressPredictionObjectFrameDataset_2(dataset_path, gripper_pc_path, object_partial_pc_path, 
+                                                   selected_objects, num_partial_pc = 1, joint_training=False)
+    
     dataset_size = len(dataset)
-    batch_size = 20     # 30   150    
+    batch_size = 150    # 30 15  150    
     
     train_len = round(dataset_size*0.9)
     test_len = round(dataset_size*0.1)
@@ -221,7 +229,7 @@ if __name__ == "__main__":
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    # model = StressNet2(num_channels=5).to(device)
+    # model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoderConv1D, joint_training=False).to(device)
     model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder, joint_training=False).to(device)
     model.apply(weights_init)
     # model.load_state_dict(torch.load(os.path.join(weight_path, "epoch " + str(51))))

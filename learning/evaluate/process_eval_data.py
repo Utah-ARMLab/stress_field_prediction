@@ -46,13 +46,14 @@ static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_predi
 data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/evaluate"
 
 
-selected_objects = ["box01"]    #["mustard_bottle", "strawberry02", "lemon02"] "box01"
+selected_objects = ["lemon02"]    #["mustard_bottle", "strawberry02", "lemon02"] "box01"
 
 
 start_time = timeit.default_timer() 
 visualization = False
 process_gripper_only = False
 save_gripper_data = True
+joint_training = False
 
 num_pts = 1024
 num_query_pts = 50000
@@ -60,11 +61,10 @@ num_query_pts = 50000
 grasp_idx_bounds = [0, 100]     # [0, 100]
 
 device = torch.device("cuda")
-# model = StressNet2(num_channels=5).to(device)
-model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder).to(device)
-# model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon/epoch 100"))
-# model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper/epoch 193"))
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ/epoch 50"))
+device = torch.device("cuda")
+# model = StressNet2(num_channels=5, joint_training=joint_training).to(device)
+model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder, joint_training=joint_training).to(device)
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ_100_views_22_objects/epoch 60"))
 model.eval()
 
 
@@ -81,6 +81,7 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
     gripper_pc_recording_path = os.path.join(data_main_path,  f"processed/open_gripper_data_{object_name}") 
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
+    pc_idx = 0
 
     ### Get static data
     with open(os.path.join(static_data_recording_path, f"{object_name}.pickle"), 'rb') as handle:
@@ -93,16 +94,16 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
     undeformed_tet_stress = static_data["undeformed_tet_stress"]
     transformed_partial_pcs = static_data["transformed_partial_pcs"]  # shape (8, num_pts, 3)
     
-    partial_pc = transformed_partial_pcs[0:1]
+    partial_pc = transformed_partial_pcs[pc_idx:pc_idx+1]
     # query = sample_points_bounding_box(trimesh.PointCloud(partial_pc.squeeze()), num_query_pts, scales=[3]*3)  # shape (num_query_pts,3)
     query = sample_points_bounding_box(trimesh.PointCloud(undeformed_full_pc), num_query_pts, scales=[1.5]*3)  # shape (num_query_pts,3)
-    query = transform_point_cloud(query, homo_mats[0])
+    query = transform_point_cloud(query, homo_mats[pc_idx])
     query_tensor = torch.from_numpy(query).float()  # shape (B, num_queries, 3)
     query_tensor = query_tensor.unsqueeze(0).to(device)  # shape (8, num_queries, 3)
 
     undeformed_object_mesh = trimesh.Trimesh(vertices=undeformed_full_pc, faces=np.array(tri_indices).reshape(-1,3).astype(np.int32))  # reconstruct the surface mesh.
 
-    signed_distances = trimesh.proximity.signed_distance(undeformed_object_mesh, transform_point_cloud(query, inverse_4x4_homogeneous_matrix(homo_mats[0])))
+    signed_distances = trimesh.proximity.signed_distance(undeformed_object_mesh, transform_point_cloud(query, inverse_4x4_homogeneous_matrix(homo_mats[pc_idx])))
     undeformed_gt_occupancy = (signed_distances >= 0.0).astype(int)
     # undeformed_gt_occupancy = is_inside_tet_mesh_vectorized(query, vertices=undeformed_full_pc, tet_indices=np.array(tet_indices).reshape(-1,4)).astype(int)
 
@@ -178,14 +179,19 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
             
             augmented_partial_pcs = np.concatenate([partial_pc, np.tile(np.array([[force, young_modulus/1e4]]), 
                                                     (1, partial_pc.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)    
-            augmented_gripper_pc_open = np.concatenate([transformed_gripper_pcs[0:1], np.tile(np.array([[0, 0]]), 
-                                                    (1, transformed_gripper_pcs[0:1].shape[1], 1))], axis=2)   # shape (8, num_pts, 5)   
+            augmented_gripper_pc_open = np.concatenate([transformed_gripper_pcs[pc_idx:pc_idx+1], np.tile(np.array([[0, 0]]), 
+                                                    (1, transformed_gripper_pcs[pc_idx:pc_idx+1].shape[1], 1))], axis=2)   # shape (8, num_pts, 5)   
             combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc_open), axis=1)
             combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
 
-            stress, occupancy = model(combined_pc_tensor, query_tensor)
+            if joint_training:
+                stress, occupancy = model(combined_pc_tensor, query_tensor)
+                pred_stress = stress.squeeze().cpu().detach().numpy()
+            else:
+                occupancy = model(combined_pc_tensor, query_tensor)
+                pred_stress = np.ones(occupancy.shape) * np.log(1e2)
 
-            pred_stress = stress.squeeze().cpu().detach().numpy()
+            
             pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
             occupied_idxs = np.where(pred_occupancy >= 0.5)[0]
             recon_full_pc = query[occupied_idxs]
@@ -198,19 +204,23 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
             combined_pcs = np.concatenate((augmented_partial_pcs, augmented_gripper_pc_open), axis=1)
             combined_pc_tensor = torch.from_numpy(combined_pcs).permute(0,2,1).float().to(device)  # shape (8, 5, num_pts*2)
 
-            stress, occupancy = model(combined_pc_tensor, query_tensor)
+            if joint_training:
+                stress, occupancy = model(combined_pc_tensor, query_tensor)
+                undeformed_pred_stress = stress.squeeze().cpu().detach().numpy()
+            else:
+                occupancy = model(combined_pc_tensor, query_tensor)
+                undeformed_pred_stress = np.ones(occupancy.shape) * np.log(1e2)
 
-            undeformed_pred_stress = stress.squeeze().cpu().detach().numpy()
             undeformed_pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
             occupied_idxs = np.where(undeformed_pred_occupancy >= 0.5)[0]
             undeformed_recon_full_pc = query[occupied_idxs]
 
 
-            # pcd_gripper = pcd_ize(transformed_gripper_pcs[0:1].squeeze(), color=[0,1,0])
+            # pcd_gripper = pcd_ize(transformed_gripper_pcs[pc_idx:pc_idx+1].squeeze(), color=[0,1,0])
             # pcd_recon = pcd_ize(recon_full_pc, color=[0,0,0])
             # pcd_undeformed_recon = pcd_ize(undeformed_recon_full_pc, color=[0,0,1]) 
-            # pcd_undeformed_transformed = pcd_ize(transform_point_cloud(undeformed_full_pc, homo_mats[0]), color=[1,0,0])
-            # pcd_gt_transformed = pcd_ize(transform_point_cloud(object_particle_state, homo_mats[0]), color=[0,0,1])
+            # pcd_undeformed_transformed = pcd_ize(transform_point_cloud(undeformed_full_pc, homo_mats[pc_idx]), color=[1,0,0])
+            # pcd_gt_transformed = pcd_ize(transform_point_cloud(object_particle_state, homo_mats[pc_idx]), color=[0,0,1])
             # open3d.visualization.draw_geometries([pcd_recon.translate((-0.07,0,0)), pcd_undeformed_recon.translate((-0.14,0,0)),
             #                                       pcd_undeformed_transformed, pcd_gt_transformed.translate((0.07,0,0)),
             #                                       pcd_gripper])
@@ -227,7 +237,7 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
             undeformed_all_stresses = compute_all_stresses(undeformed_tet_stress, adjacent_tetrahedral_dict, undeformed_full_pc.shape[0])    # np.log needs fixing, e.g. np.log(0.0) undefined 
             undeformed_all_stresses = np.where(undeformed_all_stresses > 0, np.log(undeformed_all_stresses), -4)
             
-            signed_distances = trimesh.proximity.signed_distance(object_mesh, transform_point_cloud(query, inverse_4x4_homogeneous_matrix(homo_mats[0])))
+            signed_distances = trimesh.proximity.signed_distance(object_mesh, transform_point_cloud(query, inverse_4x4_homogeneous_matrix(homo_mats[pc_idx])))
             gt_occupancy = (signed_distances >= 0.0).astype(int)
             # gt_occupancy = is_inside_tet_mesh_vectorized(query, vertices=full_pc, tet_indices=np.array(tet_indices).reshape(-1,4)).astype(int)
             # break

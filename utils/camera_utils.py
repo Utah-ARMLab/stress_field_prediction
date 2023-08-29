@@ -189,7 +189,7 @@ def grid_layout_images(images, num_columns=4, output_file=None, display_on_scree
 
 
 
-def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], output_file=None):
+def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], output_file=None, num_columns=4):
     images = []
     gym.render_all_camera_sensors(sim)
 
@@ -198,7 +198,7 @@ def visualize_camera_views(gym, sim, env, cam_handles, resolution=[1000,1000], o
         # print(image.shape)
         images.append(torch.from_numpy(image).permute(2,0,1) )
 
-    grid_layout_images(images, output_file=output_file)
+    grid_layout_images(images, num_columns, output_file=output_file)
 
 
 def export_open3d_object_to_image(open3d_objects, image_path, img_resolution=[500,500], 
