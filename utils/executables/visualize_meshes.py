@@ -21,10 +21,10 @@ gripper = create_gripper('panda', 0.00, franka_gripper_mesh_main_path="../../gra
 
 mesh_main_path = "/home/baothach/stress_field_prediction/sim_data/stress_prediction_data/dgn_dataset_varying_stiffness"
 # object_names = ["6polygon04", "cuboid01", "cylinder05", "ellipsoid04", "sphere06"]
-# object_names = [f"box0{j}" for j in [9]]   #[f"6polygon0{j}" for j in [1,4]] + [f"sphere0{j}" for j in [1,2,3,4,5,6]] 
+object_names = [f"cylinder0{j}" for j in range(2,9)]   #[f"6polygon0{j}" for j in [1,4]] + [f"sphere0{j}" for j in [1,2,3,4,5,6]] 
 # meshes = [gripper.mesh.apply_translation([-0.,0,0])]
-object_names = [f"hemi0{j}" for j in [1]] + [f"ellipsoid0{j}" for j in [1,2]] + \
-                    [f"sphere0{j}" for j in [3,4,6]]
+# object_names = [f"hemi0{j}" for j in [1]] + [f"ellipsoid0{j}" for j in [1,2]] + \
+#                     [f"sphere0{j}" for j in [3,4,6]]
 meshes = []
 
 for i, obj_name in enumerate(object_names):

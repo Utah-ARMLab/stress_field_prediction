@@ -142,10 +142,8 @@ class QueryEmbedder(nn.Module):
     '''
     Stress Prediction
     '''
-    def __init__(self, joint_training=True):
+    def __init__(self):
         super(QueryEmbedder, self).__init__()
-        
-        self.joint_training = joint_training
         
         # FC layers for query point
         self.fc1_query = nn.Linear(3, 64)
@@ -155,6 +153,13 @@ class QueryEmbedder(nn.Module):
         self.fc3_query = nn.Linear(128, 256)
         self.bn3_query = nn.GroupNorm(1, 256)
 
+        # FC layers to predict stress
+        self.fc1 = nn.Linear(512, 256)
+        self.bn1 = nn.GroupNorm(1, 256) 
+        self.fc2 = nn.Linear(256, 128)
+        self.bn2 = nn.GroupNorm(1, 128)
+        self.fc3 = nn.Linear(128, 1)
+
         # FC layers to predict occupancy (0 or 1)
         self.fc1_occ = nn.Linear(512, 256)
         self.bn1_occ = nn.GroupNorm(1, 256) 
@@ -163,15 +168,6 @@ class QueryEmbedder(nn.Module):
         self.fc3_occ = nn.Linear(128, 1)
         self.sigmoid = nn.Sigmoid()
 
-        # FC layers to predict stress
-        if joint_training:            
-            self.fc1 = nn.Linear(512, 256)
-            self.bn1 = nn.GroupNorm(1, 256) 
-            self.fc2 = nn.Linear(256, 128)
-            self.bn2 = nn.GroupNorm(1, 128)
-            self.fc3 = nn.Linear(128, 1)
-            
-
     def forward(self, pc_embedding, query):
        
         x_qr = F.relu(self.bn1_query(self.fc1_query(query)))
@@ -179,32 +175,27 @@ class QueryEmbedder(nn.Module):
         x_qr = F.relu(self.bn3_query(self.fc3_query(x_qr)))
         
         x = torch.cat((pc_embedding, x_qr),dim=-1)
+        
+        x_stress = F.relu(self.bn1(self.fc1(x)))
+        x_stress = F.relu(self.bn2(self.fc2(x_stress)))
+        x_stress = self.fc3(x_stress)
 
         x_occ = F.relu(self.bn1_occ(self.fc1_occ(x)))
         x_occ = F.relu(self.bn2_occ(self.fc2_occ(x_occ)))
         x_occ = self.fc3_occ(x_occ)
         x_occ = self.sigmoid(x_occ)
-        
-        if self.joint_training:
-            x_stress = F.relu(self.bn1(self.fc1(x)))
-            x_stress = F.relu(self.bn2(self.fc2(x_stress)))
-            x_stress = self.fc3(x_stress)
-            return x_stress, x_occ
-        
-        return x_occ
 
-        
+        return x_stress, x_occ
 
 class StressNet2(nn.Module):
     '''
     Stress Prediction
     '''
-    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D, joint_training=True):
+    def __init__(self, num_channels, pc_encoder_type=PointCloudEncoderConv1D):
         super(StressNet2, self).__init__()
         
         self.pc_encoder = pc_encoder_type(num_channels=num_channels)
-        self.qr_embedder = QueryEmbedder(joint_training=joint_training)
-        self.joint_training = joint_training
+        self.qr_embedder = QueryEmbedder()
 
     def forward(self, pc, query):
         """ 
@@ -215,15 +206,14 @@ class StressNet2(nn.Module):
         num_qrs = query.shape[1]
         
         x = self.pc_encoder(pc).squeeze() # shape (B, 256)
-        x = x.unsqueeze(1).repeat(1, num_qrs, 1) # shape (B, num_qrs, 256)
 
-        if self.joint_training:       
-            x_stress, x_occ = self.qr_embedder(x.view(-1, 256), query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
-            return x_stress, x_occ
-        else:
-            x_occ = self.qr_embedder(x.view(-1, 256), query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
-            return x_occ            
+        x = x.unsqueeze(1).repeat(1, num_qrs, 1) # shape (B, num_qrs, 256)
+        x_stress, x_occ = self.qr_embedder(x.view(-1, 256), query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
+
+        # x = x.repeat(num_qrs,1) # shape (B * num_qrs, 256)      
+        # x_stress, x_occ = self.qr_embedder(x, query.view(-1, 3)) # query.view(-1, 3): shape (B * num_qrs, 3)
         
+        return x_stress, x_occ
 
 class QueryEmbedderStressOnly(nn.Module):
     '''

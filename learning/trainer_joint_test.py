@@ -1,7 +1,7 @@
 import torch
 import torch.optim as optim
-from model import StressNet2, PointCloudEncoderConv1D, PointCloudEncoder
-from dataset_loader import StressPredictionObjectFrameDataset, StressPredictionObjectFrameDataset_2, StressPredictionFullMesh
+from model_test import StressNet2
+from dataset_loader_test import StressPredictionObjectFrameDataset, StressPredictionDataset3
 import os
 import torch.nn.functional as F
 import torch.nn as nn
@@ -13,14 +13,15 @@ import timeit
 import numpy as np
 import random
 import sys
+import argparse
 sys.path.append("../")
 from utils.miscellaneous_utils import print_color
 
 ### Log for loss/accuracy plotting later
 train_stress_losses = []
 test_stress_losses = []
-train_occ_losses = []
-test_occ_losses = []
+# train_occ_losses = []
+# test_occ_losses = []
 train_accuracies = []
 test_accuracies = []
 
@@ -37,12 +38,13 @@ def train(model, device, train_loader, optimizer, epoch):
             
         pc = sample["pc"].to(device)
         query = sample["query"].to(device)
+        target_stress = sample["stress"].to(device)
         target_occupancy = sample["occupancy"].to(device)
-        
-        # print(pc.shape, query.shape, target_occupancy.shape)
                
+        target_stress = target_stress.reshape(-1,1) # shape (total_num_qrs,1)
         target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-  
+        # num_queries = query.shape[1]
+        # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
 
         pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
         query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
@@ -54,21 +56,31 @@ def train(model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
         output = model(pc, query)
 
-        predicted_classes = (output >= 0.5).squeeze().int()
+        predicted_classes = (output[1] >= 0.5).squeeze().int()
         batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
         correct += batch_correct
-        total_num_qrs += target_occupancy.shape[0]
+        total_num_qrs += target_stress.shape[0]
 
         # if occupancy = 1, combine both losses from stress and occupancy
         # if occupancy = 0, only use the loss from occupancy            
-        loss_occ = nn.BCELoss()(output, target_occupancy) # occupancy loss
+        loss_occ = nn.BCELoss()(output[1], target_occupancy) # occupancy loss
                 
+        occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
+        if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
+            selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
+            loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs])  # stress loss
+        else:
+            loss_stress = 0
+                    
 
-        loss = loss_occ  
+        loss_occ *= 65  # balance the two stress components 65 85 70
+        
+        # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1    
+        loss = loss_occ + loss_stress   
         
         
         loss.backward()
-        train_loss += loss_occ.item()   #loss.item()
+        train_loss += loss_stress.item()   #loss.item()
         optimizer.step()
 
         if batch_idx % 100 == 0:
@@ -77,18 +89,18 @@ def train(model, device, train_loader, optimizer, epoch):
                 epoch, batch_idx * len(sample), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item()))
             
-            # print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
+            print(f"Loss occ: {loss_occ.item():.3f}. Loss Stress: {loss_stress.item():.3f}. Ratio stress/occ: {loss_stress.item()/loss_occ.item():.3f}")     # ratio should be = ~1 
             
         
         if batch_idx % 10 == 0 or batch_idx == len(train_loader.dataset) - 1:  
-            train_accuracies.append(100.* batch_correct / output.shape[0])
-            train_occ_losses.append(loss_occ.item())
+            train_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
+            train_accuracies.append(100.* batch_correct / output[0].shape[0])
     
-    print('(Train set) Average occ loss: {:.3f}'.format(
+    print('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
     print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
-    logger.info('(Train set) Average occ loss: {:.3f}'.format(
+    logger.info('(Train set) Average stress loss: {:.3f}'.format(
                 train_loss/num_batch))  
     logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%")
 
@@ -107,34 +119,42 @@ def test(model, device, test_loader, epoch):
            
             pc = sample["pc"].to(device)
             query = sample["query"].to(device)
+            target_stress = sample["stress"].to(device)
             target_occupancy = sample["occupancy"].to(device)
 
+            target_stress = target_stress.reshape(-1,1) # shape (total_num_qrs,1)
             target_occupancy = target_occupancy.reshape(-1,1) # shape (total_num_qrs,1)
-       
+            # num_queries = query.shape[1]
+            # total_num_qrs = target_stress.shape[0]  # = 8*B*num_queries = total number of query points from 8 cams, B batches (B point clouds), num_queries each batch.
 
             pc = pc.view(-1, pc.shape[-2], pc.shape[-1])  # shape (B*8, 5, num_pts*2)
             query = query.view(-1, query.shape[-2], query.shape[-1])  # shape (B*8, num_queries, 3)
-                      
+            
+            
             output = model(pc, query)
                     
-
-            loss_occ = nn.BCELoss()(output, target_occupancy)
-            test_loss += loss_occ.item()
+            occupied_idxs = torch.where(target_occupancy == 1)[0] # find where the query points belongs to volume of the obbject (occupancy = 1)        
+            total_occupied_qrs += occupied_idxs.shape[0]
+            if occupied_idxs.numel() > 0:  # Check if there are any occupied indices
+                selected_occupied_output = torch.index_select(output[0], 0, occupied_idxs)  # torch.index_select selects specific elements from output[0] based on the indices in occupied_idxs
+                loss_stress = F.mse_loss(selected_occupied_output, target_stress[occupied_idxs])  # stress loss
+                test_loss += loss_stress.item()
+           
             
-            predicted_classes = (output >= 0.5).squeeze().int()
+            predicted_classes = (output[1] >= 0.5).squeeze().int()
             batch_correct = predicted_classes.eq(target_occupancy.int().view_as(predicted_classes)).sum().item()
             correct += batch_correct
-            total_num_qrs += target_occupancy.shape[0]
+            total_num_qrs += target_stress.shape[0]
 
             # if batch_idx % 1 == 0 or batch_idx == len(test_loader.dataset) - 1:    
-            test_accuracies.append(100.* batch_correct / output.shape[0])      
-            test_occ_losses.append(loss_occ.item())
+            test_stress_losses.append(loss_stress.item() / occupied_idxs.shape[0])
+            test_accuracies.append(100.* batch_correct / output[0].shape[0])      
                             
 
     test_loss /= len(test_loader.dataset)
-    print('\n(Test set) Average occ loss: {:.3f}'.format(test_loss))
+    print('\n(Test set) Average stress loss: {:.3f}'.format(test_loss))
     print(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")  
-    logger.info('(Test set) Average occ loss: {:.3f}'.format(test_loss))
+    logger.info('(Test set) Average stress loss: {:.3f}'.format(test_loss))
     logger.info(f"Occupancy correct: {correct}/{total_num_qrs}. Accuracy: {100.*correct/total_num_qrs:.2f}%\n")   
 
 
@@ -148,14 +168,21 @@ def weights_init(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description=None)
+    parser.add_argument("--object_names", nargs="+", help="List of object names")
+    parser.add_argument('--weight_folder_name', type=str)
+    args = parser.parse_args()
+    
+    object_names = args.object_names
+    
+
     torch.manual_seed(2021)
     random.seed(2021)
-
-    
     device = torch.device("cuda")
 
     weight_path = \
-        "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/mesh_cylinders_closed_gripper_partial"
+        f"/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/{args.weight_folder_name}"   # all_6polygon_open_gripper_new_2
     os.makedirs(weight_path, exist_ok=True)
     
     logger = logging.getLogger(weight_path)
@@ -168,45 +195,18 @@ if __name__ == "__main__":
     logger.addHandler(file_handler)
     logger.info(f"Machine: {socket.gethostname()}")
    
-    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
-    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/processed"
+    dataset_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
+    gripper_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
     object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-    # object_partial_pc_path = "/home/baothach/shape_servo_data/stress_field_prediction/partial_pcs_dataset"
+    # object_names = [f"6polygon0{j}" for j in [3,5,6,7]]     # [3,4,5,6,7,8] [5,6,7,8]
 
-
-    selected_objects = []
-    # selected_objects += \
-    # [f"lemon0{j}" for j in [1,3]] + \
-    # [f"strawberry0{j}" for j in [1]] + \
-    # [f"tomato{j}" for j in [1]] + \
-    # [f"potato{j}" for j in [3]]
-    # # selected_objects += ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol"]
-    # selected_objects += [f"cylinder0{j}" for j in range(1,9)] + [f"box0{j}" for j in range(1,9)] \
-    #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
-    # selected_objects += [f"hemi0{j}" for j in [1]]
-    
-    # selected_objects += [f"hemi0{j}" for j in [1]] + \
-    #                     [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [3,4,6]] + \
-    #                     [f"box0{j}" for j in [1,2,3,4,8]] + [f"cylinder0{j}" for j in [3,4,5,6,8]] + \
-    #                     ["bleach_cleanser", "crystal_hot_sauce", "pepto_bismol"] 
-    
-    selected_objects += [f"cylinder0{j}" for j in [5,6,7,8]]  # [2,5,6,7,8]
-
-
-    # dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, selected_objects, joint_training=False)
-    # dataset = StressPredictionObjectFrameDataset_2(dataset_path, gripper_pc_path, object_partial_pc_path, 
-    #                                                selected_objects, num_partial_pc = 1, joint_training=False)
-    dataset = StressPredictionFullMesh(dataset_path, gripper_pc_path, object_partial_pc_path, 
-                                        selected_objects, joint_training=False)
-
-
+    # dataset = StressPredictionDataset3(dataset_path, gripper_pc_path, object_partial_pc_path)
+    dataset = StressPredictionObjectFrameDataset(dataset_path, gripper_pc_path, object_partial_pc_path, object_names, joint_training=True)
     dataset_size = len(dataset)
-    batch_size = 150    # 30 15  150    
+    batch_size = 250     # 30   250     
     
-    # train_len = round(dataset_size*0.9)
-    # test_len = round(dataset_size*0.1)
-    train_len = round(dataset_size*0.95)
-    test_len = dataset_size - train_len
+    train_len = round(dataset_size*0.9)
+    test_len = round(dataset_size*0.1)
     total_len = train_len + test_len
     
     # Generate random indices for training and testing without overlap
@@ -223,31 +223,28 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
 
     print("*** Total dataset size: ", len(dataset))
-    print_color(f"*** Total number of objects: {len(selected_objects)}")
+    print_color(f"*** Total number of objects: {len(object_names)}")
     print("training data: ", len(train_dataset))
     print("test data: ", len(test_dataset))
     print("data path:", dataset.dataset_path)
 
     logger.info(f"*** Total dataset size: {len(dataset)}")
-    logger.info(f"*** Total number of objects: {len(selected_objects)}")   
-    logger.info(f"\nObject list: {selected_objects}\n") 
+    logger.info(f"*** Total number of objects: {len(object_names)}")   
+    logger.info(f"\nObject list: {object_names}\n") 
     logger.info(f"Train len: {len(train_dataset)}")    
     logger.info(f"Test len: {len(test_dataset)}") 
     logger.info(f"Data path: {dataset.dataset_path}") 
     
 
-    # model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoderConv1D, joint_training=False).to(device)
-    model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder, joint_training=False).to(device)
+    model = StressNet2(num_channels=5).to(device)
     model.apply(weights_init)
-    # model.load_state_dict(torch.load(os.path.join(weight_path, "epoch " + str(51))))
+    # model.load_state_dict(torch.load(os.path.join(weight_path, "epoch " + str(62))))
       
-    optimizer = optim.Adam(model.parameters(), lr=0.001)    # lr=0.001
-    scheduler = optim.lr_scheduler.StepLR(optimizer, 50, gamma=0.1)
-    # scheduler = optim.lr_scheduler.StepLR(optimizer, 200, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, 100, gamma=0.1)
     
     start_time = timeit.default_timer()
-    # for epoch in range(0, 601):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
-    for epoch in range(0, 101):
+    for epoch in range(0, 201):     # For 6 6polygon objects, 8 transformed partial pcs, batch size 30, RTX 3090Ti, it takes ~6.8 hours to train 50 epochs.
         logger.info(f"Epoch {epoch}")
         logger.info(f"Lr: {optimizer.param_groups[0]['lr']}")
         

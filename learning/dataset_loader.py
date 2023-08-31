@@ -305,16 +305,24 @@ class StressPredictionFullMesh(Dataset):
         ### Load partial-view object point clouds   
         static_data = read_pickle_data(data_path=os.path.join(self.object_partial_pc_path, 
                                         f"{object_name}.pickle"))
-        mesh = static_data["downsampled_mesh_vertices"]   # shape (num_pts, 3)
+        # mesh = static_data["downsampled_mesh_vertices"]   # shape (num_pts, 3)
+        mesh = static_data["partial_pcs"][0]   # shape (num_pts, 3)
         
         augmented_mesh = np.concatenate([mesh, np.tile(np.array([[force, young_modulus]]), 
                                         (mesh.shape[0], 1))], axis=1)   # shape (num_pcs, num_pts, 5)
 
-        ### Load robot gripper point cloud and transform
-        gripper_pc = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"open_gripper_data_{object_name}", 
+
+        ### Load robot gripper point cloud and transform    open_gripper_data_{object_name}
+        gripper_pc = read_pickle_data(data_path=os.path.join(self.gripper_pc_path, f"gripper_data_{object_name}", 
                                     f"{object_name}_grasp_{grasp_idx}.pickle"))["gripper_pc"]  # shape (num_pts, 3)      
         augmented_gripper_pc = np.concatenate([gripper_pc, np.tile(np.array([[0, 0]]), 
                                             (gripper_pc.shape[0], 1))], axis=1)   # shape (num_pts, 5)       
+        # import open3d
+        # mesh_pcd = pcd_ize(mesh, color=[0,0,0], vis=False)
+        # query_data = read_pickle_data(data_path=os.path.join(self.dataset_path, f"processed_data_{object_name}/processed sample 0.pickle"))
+        # query_pcd = pcd_ize(query_data["query_points"][:2000], color=[1,0,0], vis=False)
+        # gripper_pcd = pcd_ize(gripper_pc, color=[0,0,1], vis=False)
+        # open3d.visualization.draw_geometries([mesh_pcd, query_pcd, gripper_pcd])
 
         ### Combine object pc and gripper pc
         combined_pcs = np.concatenate((augmented_mesh, augmented_gripper_pc), axis=0) 

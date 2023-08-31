@@ -526,7 +526,7 @@ class StaticDataCollection:
                 with open(os.path.join(static_data_recording_path, f"{self.object_name}.pickle"), 'wb') as handle:
                     pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL) 
 
-                   
+ 
                 # # pcds = []
                 # # for pc in partial_pcs:
                 # #     pcds.append(pcd_ize(pc))

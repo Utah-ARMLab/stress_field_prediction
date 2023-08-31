@@ -41,12 +41,12 @@ selected_objects = []
 #                 + [f"ellipsoid0{j}" for j in range(1,6)] + [f"sphere0{j}" for j in [1,3,4,6]]
 
 # selected_objects += ["bleach_cleanser"] #[f"cylinder0{j}" for j in range(4,5)]
-selected_objects += [f"hemi0{j}" for j in [1]]
+selected_objects += [f"cylinder0{j}" for j in range(1,9)]
 
 
 start_time = timeit.default_timer() 
 visualization = False
-process_gripper_only = False
+process_gripper_only = True
 save_gripper_data = True
 stress_visualization_min = np.log(1e2)  # 1e3
 stress_visualization_max = np.log(1e5)  # 5e4 1e4
@@ -67,8 +67,8 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
         data_processed_path = os.path.join(data_main_path,  f"processed/processed_data_{object_name}")       
         os.makedirs(data_processed_path, exist_ok=True)
         data_point_count = len(os.listdir(data_processed_path))
-    # gripper_pc_recording_path = os.path.join(data_main_path,  f"gripper_data_{object_name}")
-    gripper_pc_recording_path = os.path.join(data_main_path,  f"processed/open_gripper_data_{object_name}") 
+    gripper_pc_recording_path = os.path.join(data_main_path,  f"processed/gripper_data_{object_name}") 
+    # gripper_pc_recording_path = os.path.join(data_main_path,  f"processed/open_gripper_data_{object_name}") 
     os.makedirs(gripper_pc_recording_path, exist_ok=True)
 
 
@@ -123,8 +123,8 @@ for object_name in selected_objects:    # 1,2,3,4,5,6,7,8
                 fingers_joint_angles[0] += 0.005
                 fingers_joint_angles[1] += 0.005
 
-                # gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts)
-                gripper_pc = get_gripper_point_cloud(grasp_pose, [0.04,0.04], num_pts=num_pts)
+                gripper_pc = get_gripper_point_cloud(grasp_pose, fingers_joint_angles, num_pts=num_pts) # closed gripper
+                # gripper_pc = get_gripper_point_cloud(grasp_pose, [0.04,0.04], num_pts=num_pts) # open gripper
                 
                 
                 transformed_gripper_pcs = []

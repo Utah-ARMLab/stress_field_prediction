@@ -2,7 +2,7 @@ import open3d
 import isaacgym
 import os
 import numpy as np
-import pickle5 as pickle
+import pickle
 import timeit
 import sys
 sys.path.append("../")
@@ -11,14 +11,13 @@ from utils.miscellaneous_utils import pcd_ize, scalar_to_rgb, read_pickle_data, 
 from utils.point_cloud_utils import transform_point_cloud
 from utils.stress_utils import *
 from utils.camera_utils import grid_layout_images, export_open3d_object_to_image, overlay_texts_on_image, create_media_from_images
-from model_test import StressNet2, PointCloudEncoder
+from model_test import StressNet2
 from copy import deepcopy
-import re
 
+
+gripper_pc_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness"
 static_data_recording_path = "/home/baothach/shape_servo_data/stress_field_prediction/static_data_original"
-data_main_path = "/home/baothach/shape_servo_data/stress_field_prediction/all_primitives"
-gripper_pc_recording_path = os.path.join(data_main_path,  f"processed")
-media_path = "/home/baothach/stress_field_prediction/visualization/stress_prediction_results/videos/all_objects"
+media_path = "/home/baothach/stress_field_prediction/visualization/stress_prediction_results/videos/6polygons"
 
 start_time = timeit.default_timer() 
 visualization = False
@@ -28,24 +27,21 @@ use_open_gripper = True
 
 device = torch.device("cuda")
 model = StressNet2(num_channels=5).to(device)
-# model = StressNet2(num_channels=5, pc_encoder_type=PointCloudEncoder).to(device)
 # model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon/epoch 100"))
-model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper/epoch 193"))
-# model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/all_primitives/weights/all_objects_occ/epoch 50"))
+model.load_state_dict(torch.load("/home/baothach/shape_servo_data/stress_field_prediction/6polygon/varying_stiffness/weights/all_6polygon_open_gripper_new_3/epoch 50")) # _new_2
 model.eval()
-# mustard_bottle
 
-for idx, file_name in enumerate([f"cylinder02"]):
+
+for idx, file_name in enumerate([f"6polygon0{j}" for j in [1]]):
     object_name = os.path.splitext(file_name)[0]
-    prim_name = object_name[:-2]    #re.search(r'(\D+)', object_name).group(1)
-    data_recording_path = os.path.join(data_main_path, f"all_{prim_name}_data")
+
     print("======================")
 
 
 
     for k in range(0,100):    # 100 grasp poses 32, 7, 8(doesnt work),
-         
-        gripper_file_name = os.path.join(gripper_pc_recording_path, f"open_gripper_data_{object_name}", f"{object_name}_grasp_{k}.pickle")          
+        
+        gripper_file_name = os.path.join(gripper_pc_recording_path, f"gripper_data_{object_name}", f"{object_name}_grasp_{k}.pickle")          
         if not os.path.isfile(gripper_file_name):            
             print_color(f"{gripper_file_name} not found")
             continue
@@ -72,7 +68,7 @@ for idx, file_name in enumerate([f"cylinder02"]):
         partial_pcs = static_data["transformed_partial_pcs"]
         pc_idx = 0
         partial_pc = partial_pcs[pc_idx:pc_idx+1,:,:]
-
+        partial_pc_ori = static_data["partial_pcs"][pc_idx]
 
         ### Load robot gripper point cloud when making contact with object
         gripper_pc = gripper_data["transformed_gripper_pcs"][pc_idx:pc_idx+1,:,:]   # shape (8, num_pts, 3)
@@ -80,27 +76,8 @@ for idx, file_name in enumerate([f"cylinder02"]):
         #                                         (1, gripper_pc.shape[1], 1))], axis=2)   # shape (8, num_pts, 5)      
         pcd_gripper = pcd_ize(gripper_pc.squeeze(), color=(0,0,0))
 
-
-        file_name = os.path.join(data_recording_path, f"{object_name}_grasp_{k}_force_{0}.pickle")
-
-        with open(file_name, 'rb') as handle:
-            data = pickle.load(handle)
-        full_pc = data["object_particle_state"]
-        pcd_gt = pcd_ize(transform_point_cloud(full_pc, homo_mats[pc_idx]), color=[1,0,0])
-        
-        
-        # temp_obj_name = "ellipsoid05"
-        # temp_prim_name = re.search(r'(\D+)', temp_obj_name).group(1)
-        # file_name = os.path.join(data_main_path, f"all_{temp_prim_name}_data", f"{temp_obj_name}_grasp_{k}_force_{0}.pickle")
-
-        # with open(file_name, 'rb') as handle:
-        #     data = pickle.load(handle)
-        # full_pc_test = data["object_particle_state"]
-        # pcd_test = pcd_ize(transform_point_cloud(full_pc_test, homo_mats[pc_idx]), color=[1,0,0])        
-
-
         ### Sample query points
-        query = sample_points_bounding_box(trimesh.PointCloud(partial_pc.squeeze()), num_query_pts, scales=[3]*3)  # shape (num_query_pts,3) 
+        query = sample_points_bounding_box(trimesh.PointCloud(partial_pc.squeeze()), num_query_pts, scales=[5]*3)  # shape (num_query_pts,3) 
 
 
 
@@ -113,8 +90,8 @@ for idx, file_name in enumerate([f"cylinder02"]):
         stress_visualization_min = np.log(1e2)  # 1e3
         stress_visualization_max = np.log(5e4)  # 5e4 1e4
 
-        for force in range(0, 10, 2):   # range(0, 16, 3) range(0, 10, 2)
-            for young_modulus in [5]:     # [3, 5, 8, 10, 20, 50] [50,20,10,8,5,3]
+        for force in [0]:   # range(0, 16, 3) range(0, 10, 2)
+            for young_modulus in [3]:     # [3, 5, 8, 10, 20, 50] [50,20,10,8,5,3]
  
                 print(f"{object_name} - grasp {k} - young {young_modulus:.3f} - force {force:.2f} started")
                                   
@@ -137,7 +114,7 @@ for idx, file_name in enumerate([f"cylinder02"]):
 
                 pred_stress = stress.squeeze().cpu().detach().numpy()
                 pred_occupancy = occupancy.squeeze().cpu().detach().numpy()
-                occupied_idxs = np.where(pred_occupancy >= 0.7)[0]
+                occupied_idxs = np.where(pred_occupancy >= 0.99)[0]
 
 
                 pcd = pcd_ize(query[occupied_idxs], color=[0,1,0])
@@ -153,11 +130,10 @@ for idx, file_name in enumerate([f"cylinder02"]):
                 # cam_up_vector = [0, 0, 1]
                 cam_position=[0.0, 0.0, 1.0]
                 cam_target = [0, 0, 0]
-                cam_up_vector = [0, 1, 0]   # pcd_test.translate((-0.12,0,0)) , pcd_gt
+                cam_up_vector = [0, 1, 0] 
 
                 if not create_media:            
-                    open3d.visualization.draw_geometries([pcd, pcd_gripper, pcd_gripper_open,
-                                                          ])
+                    open3d.visualization.draw_geometries([pcd, pcd_gripper, pcd_gripper_open])
                     
 
                     # coor = open3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05)
@@ -202,7 +178,6 @@ for idx, file_name in enumerate([f"cylinder02"]):
 
 
         # break
-
 
 
 

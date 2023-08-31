@@ -901,6 +901,7 @@ class PandaFsm:
                     "strawberry02": 7.0,
                     "lemon02": 7.0,
                     "box01": 10.0,
+                    "cylinder04": 3.0,
                 }
                 self.desired_force = switch_dict.get(self.obj_name, None)
                 self.max_force_allowed = self.desired_force + 5.0
@@ -1219,7 +1220,7 @@ class PandaFsm:
 
 
             if self.cfg['data_recording']['is_evaluating']:
-                if abs(self.f_moving_average[-1] - self.desired_force) <= 0.25:
+                if abs(self.f_moving_average[-1] - self.desired_force) <= 0.15: # 0.25
                     data_file_name = os.path.join(self.data_recording_path, f"{self.object_name}_grasp_{self.grasp_ind}_force_{0}.pickle")
                     
                     force_fingers_joint_angles = [self.franka_dof_states['pos'][-3:][1], 
